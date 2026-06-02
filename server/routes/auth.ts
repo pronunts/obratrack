@@ -29,7 +29,7 @@ authRouter.post('/register', async (req, res): Promise<any> => {
       createdAt: new Date(),
     }).returning().get();
 
-    const token = jwt.sign({ userId: result.id }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: result.id }, JWT_SECRET, { expiresIn: '30d' });
     
     res.status(201).json({ user: { id: result.id, email: result.email, nombre: result.nombre }, token });
   } catch (error) {
@@ -55,7 +55,7 @@ authRouter.post('/login', async (req, res): Promise<any> => {
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
     res.json({ user: { id: user.id, email: user.email, nombre: user.nombre }, token });
   } catch (error) {
     console.error('Error in login:', error);
