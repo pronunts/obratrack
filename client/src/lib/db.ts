@@ -196,12 +196,20 @@ export async function syncAllToCloud(): Promise<{ uploaded: number }> {
   return { uploaded: pendingEjecuciones.length + pendingGastos.length };
 }
 
-// ── Fetch del servidor con merge inteligente ──────────────────────────────────
-// Reglas de merge:
-//   Proyectos:  server gana si `actualizadoEn` server ≥ local, o si local ya está sincronizado.
-//   Partidas:   server siempre gana (son read-only post-importación).
-//   Ejecuciones/Gastos: append-only — el server agrega los suyos, NO sobreescribe
-//               items locales con `sincronizado: false` (cambios offline del usuario).
+// ── Fetch + Reconcile con el servidor ────────────────────────────────────────
+//
+// ANALOGÍA OBRA CIVIL:
+//   El servidor es el "Libro de Actas Notarial" — la versión oficial.
+//   Cada dispositivo tiene una "Copia de Campo".
+//   Esta función es el proceso de "actualizar la copia de campo":
+//     1. PULL: trae todo lo que tiene el acta oficial  → agrega/actualiza local
+//     2. RECONCILE: lo que está en la copia de campo pero YA NO está en el
+//        acta oficial fue anulado/eliminado → se tacha de la copia de campo
+//
+// REGLAS de qué se puede borrar localmente:
+//   - Solo se borra si sincronizado = true  (ya fue reconocido por el servidor)
+//   - NUNCA se borra si sincronizado = false (son cambios pendientes de elevar
+//     al acta — equivale a una hoja de campo aún no firmada)
 
 export async function fetchAllFromCloud(): Promise<void> {
   const token = localStorage.getItem('obratrack_token');
@@ -213,42 +221,69 @@ export async function fetchAllFromCloud(): Promise<void> {
 
   const {
     proyectos: sProyectos = [],
-    partidas: sPartidas = [],
+    partidas:  sPartidas  = [],
     ejecuciones: sEjecuciones = [],
-    gastos: sGastos = [],
+    gastos:    sGastos    = [],
   } = response.data;
 
-  // Obtener IDs de items pendientes locales para protegerlos del sobreescritura
-  const [pendingEj, pendingGa] = await Promise.all([
-    db.ejecuciones.filter(e => !e.sincronizado).toArray(),
-    db.gastos.filter(g => !g.sincronizado).toArray(),
+  // IDs que el servidor reconoce como vigentes
+  const serverProyectoIds  = new Set<string>(sProyectos.map((p: any) => p.id));
+  const serverPartidaIds   = new Set<string>(sPartidas.map((p: any) => p.id));
+  const serverEjecucionIds = new Set<string>(sEjecuciones.map((e: any) => e.id));
+  const serverGastoIds     = new Set<string>(sGastos.map((g: any) => g.id));
+
+  // Registros locales que el servidor ya no tiene → fueron eliminados en otro dispositivo
+  // Solo tocamos los que tienen sincronizado=true (los pendientes son offline y los protegemos)
+  const [
+    localProyectosSynced,
+    localPartidasSynced,
+    localEjecucionesSynced,
+    localGastosSynced,
+  ] = await Promise.all([
+    db.proyectos.filter(p => !!p.sincronizado).toArray(),
+    db.partidas.filter(p => !!p.sincronizado).toArray(),
+    db.ejecuciones.filter(e => !!e.sincronizado).toArray(),
+    db.gastos.filter(g => !!g.sincronizado).toArray(),
   ]);
-  const pendingEjIds = new Set(pendingEj.map(e => e.id));
-  const pendingGaIds = new Set(pendingGa.map(g => g.id));
+
+  const toDeleteProyectos  = localProyectosSynced.filter(p => !serverProyectoIds.has(p.id)).map(p => p.id);
+  const toDeletePartidas   = localPartidasSynced.filter(p => !serverPartidaIds.has(p.id)).map(p => p.id);
+  const toDeleteEjecuciones = localEjecucionesSynced.filter(e => !serverEjecucionIds.has(e.id)).map(e => e.id);
+  const toDeleteGastos     = localGastosSynced.filter(g => !serverGastoIds.has(g.id)).map(g => g.id);
+
+  // IDs pendientes (no subidos aún) — no los pisamos con datos del server
+  const pendingEjIds = new Set(
+    (await db.ejecuciones.filter(e => !e.sincronizado).toArray()).map(e => e.id)
+  );
+  const pendingGaIds = new Set(
+    (await db.gastos.filter(g => !g.sincronizado).toArray()).map(g => g.id)
+  );
 
   await db.transaction('rw', db.proyectos, db.partidas, db.ejecuciones, db.gastos, async () => {
-    // Proyectos: merge por timestamp
+    // ── Paso 1: eliminar lo que el servidor ya no tiene ───────────────────
+    if (toDeleteProyectos.length)   await db.proyectos.bulkDelete(toDeleteProyectos);
+    if (toDeletePartidas.length)    await db.partidas.bulkDelete(toDeletePartidas);
+    if (toDeleteEjecuciones.length) await db.ejecuciones.bulkDelete(toDeleteEjecuciones);
+    if (toDeleteGastos.length)      await db.gastos.bulkDelete(toDeleteGastos);
+
+    // ── Paso 2: agregar / actualizar con datos del servidor ───────────────
+    // Proyectos: server gana si es más nuevo O si ya estaba sincronizado
     for (const sp of sProyectos) {
       const local = await db.proyectos.get(sp.id);
-      const serverIsNewer = !local || new Date(sp.actualizadoEn) >= new Date(local.actualizadoEn);
-      const localHasOfflineChanges = local && !local.sincronizado;
-
-      if (!localHasOfflineChanges || serverIsNewer) {
+      const offlinePendiente = local && !local.sincronizado;
+      const serverEsMasNuevo = !local || new Date(sp.actualizadoEn) >= new Date(local.actualizadoEn);
+      if (!offlinePendiente || serverEsMasNuevo) {
         await db.proyectos.put({ ...sp, sincronizado: true });
       }
     }
 
-    // Partidas: server siempre gana (importación masiva, read-only)
-    if (sPartidas.length) {
-      await db.partidas.bulkPut(sPartidas);
-    }
+    // Partidas: el servidor siempre manda (provienen de importación CSV)
+    if (sPartidas.length) await db.partidas.bulkPut(sPartidas);
 
-    // Ejecuciones: agregar solo las que no existen localmente como pendientes
+    // Ejecuciones y Gastos: agregar del server, pero no pisar los pendientes locales
     const ejToAdd = sEjecuciones.filter((e: any) => !pendingEjIds.has(e.id));
-    if (ejToAdd.length) await db.ejecuciones.bulkPut(ejToAdd);
-
-    // Gastos: ídem
     const gaToAdd = sGastos.filter((g: any) => !pendingGaIds.has(g.id));
+    if (ejToAdd.length) await db.ejecuciones.bulkPut(ejToAdd);
     if (gaToAdd.length) await db.gastos.bulkPut(gaToAdd);
   });
 }

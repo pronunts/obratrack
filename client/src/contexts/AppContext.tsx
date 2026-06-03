@@ -587,9 +587,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const proyectos = await loadProyectos();
     dispatch({ type: 'SET_PROYECTOS', payload: proyectos });
 
-    if (state.proyectoActivoId && proyectos.some(p => p.id === state.proyectoActivoId)) {
-      const data = await loadProyectoData(state.proyectoActivoId);
-      dispatch({ type: 'SET_PROYECTO_ACTIVO', payload: { id: state.proyectoActivoId, ...data } });
+    const activoAun = state.proyectoActivoId && proyectos.some(p => p.id === state.proyectoActivoId);
+
+    if (activoAun) {
+      const data = await loadProyectoData(state.proyectoActivoId!);
+      dispatch({ type: 'SET_PROYECTO_ACTIVO', payload: { id: state.proyectoActivoId!, ...data } });
+    } else if (state.proyectoActivoId) {
+      // El proyecto activo fue eliminado en otro dispositivo — limpiar el estado local
+      setUIPrefs({ proyectoActivoId: null });
+      dispatch({ type: 'REMOVE_PROYECTO', payload: state.proyectoActivoId });
     }
 
     const pendientes = await countAllPendientes();
