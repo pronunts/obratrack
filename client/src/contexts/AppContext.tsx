@@ -200,10 +200,12 @@ interface AppContextValue {
   actualizarProyecto: (proyecto: Proyecto) => Promise<void>;
   // Acciones de presupuesto
   importarPresupuesto: (result: ParseResult, proyectoData?: Partial<Proyecto>) => Promise<void>;
+  editarPartida: (partida: PartidaPresupuesto) => Promise<void>;
   // Acciones de ejecución
   registrarEjecucion: (partidaId: string, cantidad: number, fecha: string, observaciones?: string) => Promise<void>;
   eliminarEjecucion: (id: string) => Promise<void>;
   // Acciones de gastos
+  editarGasto: (gasto: GastoDiario) => Promise<void>;
   registrarGasto: (
     partidaId: string,
     descripcion: string,
@@ -496,11 +498,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setUIPrefs({ proyectoActivoId: proyectoId });
     }
 
-    // Agregar proyectoId y sincronizado a las partidas
+    // Agregar proyectoId, sincronizado y valores originales del CSV (para Revertir)
     const partidas: PartidaPresupuesto[] = result.partidas.map(p => ({
       ...p,
       proyectoId: proyectoId!,
       sincronizado: false,
+      descripcionOriginal: p.descripcion,
+      cantidadPlaneadaOriginal: p.cantidadPlaneada,
+      precioUnitarioUSDOriginal: p.precioUnitarioUSD,
     }));
 
     await importarPartidasBulk(proyectoId!, partidas);
@@ -580,6 +585,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'DELETE_GASTO', payload: id });
   }, []);
 
+  const editarPartida = useCallback(async (partida: PartidaPresupuesto) => {
+    const updated: PartidaPresupuesto = {
+      ...partida,
+      precioTotalUSD: partida.cantidadPlaneada * partida.precioUnitarioUSD,
+      sincronizado: false,
+    };
+    await db.partidas.put(updated);
+    dispatch({ type: 'SET_PARTIDAS', payload: state.partidas.map(p => p.id === updated.id ? updated : p) });
+    autoSyncIfOnline();
+  }, [state.partidas, autoSyncIfOnline]);
+
+  const editarGasto = useCallback(async (gasto: GastoDiario) => {
+    const montoUSD = gasto.moneda === 'USD' ? gasto.monto : gasto.monto / gasto.tasaCambio;
+    const updated: GastoDiario = { ...gasto, montoUSD, sincronizado: false };
+    await db.gastos.put(updated);
+    dispatch({ type: 'UPDATE_GASTO', payload: updated });
+    autoSyncIfOnline();
+  }, [autoSyncIfOnline]);
+
   // ── Sincronización ────────────────────────────────────
 
   // Helper para registrar timestamp y recargar estado tras un sync exitoso
@@ -633,10 +657,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       eliminarProyecto,
       actualizarProyecto,
       importarPresupuesto,
+      editarPartida,
       registrarEjecucion,
       eliminarEjecucion,
       registrarGasto,
       eliminarGasto,
+      editarGasto,
       sincronizar,
       descartarCambiosLocales,
     }}>

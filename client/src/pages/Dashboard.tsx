@@ -3,11 +3,12 @@
 // Design: Blueprint Engineering — hero con imagen de obra
 // ============================================================
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { EditarProyectoModal } from '@/components/EditarProyectoModal';
 import {
   TrendingUp, TrendingDown, AlertTriangle, CheckCircle2,
   Clock, Wifi, WifiOff, FileText, BarChart3, Layers,
-  Calendar, Building2
+  Calendar, Building2, Pencil
 } from 'lucide-react';
 import {
   RadialBarChart, RadialBar, ResponsiveContainer, Tooltip
@@ -38,6 +39,7 @@ function StatCard({ label, value, sub, color = 'default' }: {
 
 export default function Dashboard() {
   const { state, proyectoActivo, getResumenPartidas } = useApp();
+  const [editando, setEditando] = useState(false);
   const resumenes = getResumenPartidas();
 
   const totalPresupuestado = state.partidas.reduce((s, p) => s + p.precioTotalUSD, 0);
@@ -126,9 +128,18 @@ export default function Dashboard() {
         </div>
         <div className="absolute bottom-0 left-0 right-0 p-4">
           <p className="text-xs text-white/60 mb-0.5 capitalize">{today}</p>
-          <h1 className="text-xl font-bold text-white leading-tight">
-            {proyectoActivo?.nombre ?? 'Mi Proyecto'}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-white leading-tight">
+              {proyectoActivo?.nombre ?? 'Mi Proyecto'}
+            </h1>
+            {proyectoActivo && (
+              <button onClick={() => setEditando(true)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+                title="Editar proyecto">
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
           {state.pendientesSincronizacion > 0 && (
             <div className="flex items-center gap-1.5 mt-1">
               <Clock className="w-3 h-3 text-amber-400" />
@@ -279,6 +290,10 @@ export default function Dashboard() {
               );
             })}
         </div>
+      )}
+
+      {editando && proyectoActivo && (
+        <EditarProyectoModal proyecto={proyectoActivo} onClose={() => setEditando(false)} />
       )}
     </div>
   );

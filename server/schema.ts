@@ -27,6 +27,9 @@ export const proyectos = sqliteTable('proyectos', {
   monedaLocal: text('moneda_local').notNull().default('USD'),
   tasaCambioDefault: real('tasa_cambio_default').notNull().default(1),
   archivoOrigen: text('archivo_origen'),
+  cliente: text('cliente'),
+  ingenieroResidente: text('ingeniero_residente'),
+  contacto: text('contacto'),
   creadoEn: text('creado_en').notNull(),
   actualizadoEn: text('actualizado_en').notNull(),
 });

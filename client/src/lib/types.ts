@@ -16,16 +16,20 @@ export interface Proyecto {
   monedaLocal: string;       // ej. "COP", "PEN", "BOB"
   tasaCambioDefault: number; // unidades de moneda local por 1 USD
   archivoOrigen?: string;    // nombre del archivo importado
+  // Datos del equipo
+  cliente?: string;
+  ingenieroResidente?: string;
+  contacto?: string;
   creadoEn: string;          // ISO timestamp
   actualizadoEn: string;     // ISO timestamp
   // Metadatos de sincronización
   sincronizado: boolean;
-  remoteId?: string;         // ID en Supabase/Firebase cuando se conecte
+  remoteId?: string;
 }
 
 export interface PartidaPresupuesto {
   id: string;
-  proyectoId: string;        // FK → Proyecto
+  proyectoId: string;
   capitulo: string;
   codigo: string;
   descripcion: string;
@@ -33,8 +37,11 @@ export interface PartidaPresupuesto {
   cantidadPlaneada: number;
   precioUnitarioUSD: number;
   precioTotalUSD: number;
-  // Metadatos de sincronización
   sincronizado: boolean;
+  // Valores del CSV original — para la función "Revertir"
+  descripcionOriginal?: string;
+  cantidadPlaneadaOriginal?: number;
+  precioUnitarioUSDOriginal?: number;
 }
 
 export interface RegistroEjecucion {

@@ -48,11 +48,18 @@ client.execute(`
     moneda_local TEXT NOT NULL DEFAULT 'USD',
     tasa_cambio_default REAL NOT NULL DEFAULT 1,
     archivo_origen TEXT,
+    cliente TEXT,
+    ingeniero_residente TEXT,
+    contacto TEXT,
     creado_en TEXT NOT NULL,
     actualizado_en TEXT NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
 `);
+// Migraciones para tablas existentes (idempotentes)
+client.execute(`ALTER TABLE proyectos ADD COLUMN cliente TEXT`).catch(() => {});
+client.execute(`ALTER TABLE proyectos ADD COLUMN ingeniero_residente TEXT`).catch(() => {});
+client.execute(`ALTER TABLE proyectos ADD COLUMN contacto TEXT`).catch(() => {});
 
 client.execute(`
   CREATE TABLE IF NOT EXISTS partidas (

@@ -7,8 +7,9 @@ import { useState } from 'react';
 import {
   Plus, Building2, ChevronRight, Trash2, FolderOpen,
   Calendar, DollarSign, Layers, Clock, CheckCircle2,
-  AlertTriangle, WifiOff, Wifi, X
+  AlertTriangle, WifiOff, Wifi, X, Pencil
 } from 'lucide-react';
+import { EditarProyectoModal } from '@/components/EditarProyectoModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -166,9 +167,10 @@ interface ProyectoCardProps {
   isActive: boolean;
   onSelect: () => void;
   onDelete: () => void;
+  onEdit: (p: Proyecto) => void;
 }
 
-function ProyectoCard({ proyecto, isActive, onSelect, onDelete }: ProyectoCardProps) {
+function ProyectoCard({ proyecto, isActive, onSelect, onDelete, onEdit }: ProyectoCardProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -219,6 +221,13 @@ function ProyectoCard({ proyecto, isActive, onSelect, onDelete }: ProyectoCardPr
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <button
+              onClick={e => { e.stopPropagation(); onEdit(proyecto); }}
+              className="p-1.5 rounded-lg hover:bg-primary/10 hover:text-primary text-muted-foreground opacity-0 group-hover:opacity-100 transition-colors"
+              title="Editar proyecto"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button
               onClick={handleDelete}
               className={`p-1.5 rounded-lg transition-colors ${
                 confirmDelete
@@ -262,6 +271,7 @@ function ProyectoCard({ proyecto, isActive, onSelect, onDelete }: ProyectoCardPr
 export default function ProyectosDashboard() {
   const { state, seleccionarProyecto, eliminarProyecto } = useApp();
   const [showForm, setShowForm] = useState(false);
+  const [proyectoAEditar, setProyectoAEditar] = useState<Proyecto | null>(null);
 
   const handleSelect = async (id: string) => {
     if (id === state.proyectoActivoId) return;
@@ -334,6 +344,7 @@ export default function ProyectosDashboard() {
               isActive={proyecto.id === state.proyectoActivoId}
               onSelect={() => handleSelect(proyecto.id)}
               onDelete={() => handleDelete(proyecto.id)}
+              onEdit={p => setProyectoAEditar(p)}
             />
           ))}
         </div>
@@ -353,6 +364,9 @@ export default function ProyectosDashboard() {
           onClose={() => setShowForm(false)}
           onCreated={() => setShowForm(false)}
         />
+      )}
+      {proyectoAEditar && (
+        <EditarProyectoModal proyecto={proyectoAEditar} onClose={() => setProyectoAEditar(null)} />
       )}
     </div>
   );

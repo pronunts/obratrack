@@ -6,7 +6,8 @@
 import { useState, useMemo } from 'react';
 import {
   DollarSign, TrendingUp, TrendingDown, Plus, X,
-  AlertTriangle, Trash2, ChevronDown, ChevronUp, BarChart3
+  AlertTriangle, Trash2, ChevronDown, ChevronUp, BarChart3,
+  Pencil, Save
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -29,6 +30,125 @@ const CATEGORIAS: { value: GastoDiario['categoria']; label: string; icon: string
   { value: 'equipo',    label: 'Equipo/Maquinaria', icon: '🚜' },
   { value: 'otro',      label: 'Otro',             icon: '📦' },
 ];
+
+// ── Modal de edición de gasto ────────────────────────────
+
+function EditarGastoModal({ gasto, onClose }: { gasto: GastoDiario; onClose: () => void }) {
+  const { editarGasto, proyectoActivo } = useApp();
+  const [descripcion, setDescripcion]   = useState(gasto.descripcion);
+  const [monto, setMonto]               = useState(String(gasto.monto));
+  const [moneda, setMoneda]             = useState<'USD' | 'LOCAL'>(gasto.moneda);
+  const [tasaCambio, setTasaCambio]     = useState(gasto.tasaCambio);
+  const [categoria, setCategoria]       = useState<GastoDiario['categoria']>(gasto.categoria);
+  const [fecha, setFecha]               = useState(gasto.fecha);
+  const [saving, setSaving]             = useState(false);
+  const [errors, setErrors]             = useState<Record<string, string>>({});
+
+  const montoUSD = useMemo(() => {
+    const m = parseFloat(monto) || 0;
+    return moneda === 'USD' ? m : m / tasaCambio;
+  }, [monto, moneda, tasaCambio]);
+
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!descripcion.trim()) e.descripcion = 'La descripción no puede estar vacía';
+    const m = parseFloat(monto);
+    if (isNaN(m) || m <= 0) e.monto = 'El monto debe ser mayor a 0';
+    return e;
+  };
+
+  const handleGuardar = async () => {
+    const e = validate();
+    if (Object.keys(e).length) { setErrors(e); return; }
+    setSaving(true);
+    try {
+      await editarGasto({ ...gasto, descripcion: descripcion.trim(), monto: parseFloat(monto), moneda, tasaCambio, categoria, fecha });
+      toast.success('Gasto actualizado correctamente');
+      onClose();
+    } catch {
+      toast.error('Error al guardar');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-2xl">
+        <div className="flex items-center justify-between p-5 border-b border-border">
+          <h2 className="font-bold text-base flex items-center gap-2"><Pencil className="w-4 h-4 text-primary" />Editar Gasto</h2>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted transition-colors"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-sm font-semibold">Descripción</Label>
+            <Input value={descripcion} onChange={e => { setDescripcion(e.target.value); setErrors(ev => ({ ...ev, descripcion: '' })); }}
+              className="h-12" placeholder="Descripción del gasto" />
+            {errors.descripcion && <p className="text-xs text-red-500">{errors.descripcion}</p>}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-semibold">Monto</Label>
+              <Input type="number" value={monto} min="0.01" step="0.01"
+                onChange={e => { setMonto(e.target.value); setErrors(ev => ({ ...ev, monto: '' })); }}
+                className="h-12 font-mono text-lg text-center" />
+              {errors.monto && <p className="text-xs text-red-500">{errors.monto}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-semibold">Moneda</Label>
+              <div className="flex gap-2 h-12 items-center">
+                {(['USD', 'LOCAL'] as const).map(m => (
+                  <button key={m} onClick={() => setMoneda(m)}
+                    className={`flex-1 h-12 rounded-lg border text-sm font-bold transition-colors
+                      ${moneda === m ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted'}`}>
+                    {m === 'LOCAL' ? (proyectoActivo?.monedaLocal ?? 'LOCAL') : m}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          {moneda === 'LOCAL' && (
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Tasa de Cambio</Label>
+              <Input type="number" value={tasaCambio} min="0.0001" step="0.01"
+                onChange={e => setTasaCambio(Number(e.target.value))} className="h-12 font-mono" />
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-semibold">Categoría</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {CATEGORIAS.map(c => (
+                <button key={c.value} onClick={() => setCategoria(c.value)}
+                  className={`h-12 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 transition-colors
+                    ${categoria === c.value ? 'bg-primary/10 border-primary text-primary' : 'border-border hover:bg-muted'}`}>
+                  <span>{c.icon}</span>{c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-semibold">Fecha</Label>
+            <Input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className="h-12" />
+          </div>
+          <div className="bg-muted/50 rounded-xl p-3 flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Equivalente USD</span>
+            <span className="font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+              ${montoUSD.toFixed(2)} USD
+            </span>
+          </div>
+        </div>
+        <div className="px-5 pb-5 flex gap-3">
+          <Button variant="outline" className="flex-1 h-12" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button className="flex-1 h-12 font-bold" onClick={handleGuardar} disabled={saving}>
+            {saving
+              ? <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              : <><Save className="w-4 h-4 mr-2" />Guardar</>}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Formulario de Gasto ───────────────────────────────────
 
@@ -223,6 +343,7 @@ export default function Costos() {
   const { state, proyectoActivo, getResumenPartidas, eliminarGasto } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [expandedPartida, setExpandedPartida] = useState<string | null>(null);
+  const [gastoAEditar, setGastoAEditar] = useState<GastoDiario | null>(null);
   const [chartView, setChartView] = useState<'top10' | 'all'>('top10');
 
   const resumenes = getResumenPartidas();
@@ -457,12 +578,21 @@ export default function Costos() {
                               )}
                             </div>
                           </div>
-                          <button
-                            className="p-1.5 rounded hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0"
-                            onClick={() => { eliminarGasto(g.id); toast.info('Gasto eliminado'); }}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              className="p-1.5 rounded hover:bg-primary/10 hover:text-primary transition-colors"
+                              onClick={() => setGastoAEditar(g)}
+                              title="Editar gasto"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              className="p-1.5 rounded hover:bg-destructive/10 hover:text-destructive transition-colors"
+                              onClick={() => { eliminarGasto(g.id); toast.info('Gasto eliminado'); }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -483,6 +613,7 @@ export default function Costos() {
       )}
 
       {showForm && <GastoForm onClose={() => setShowForm(false)} />}
+      {gastoAEditar && <EditarGastoModal gasto={gastoAEditar} onClose={() => setGastoAEditar(null)} />}
     </div>
   );
 }

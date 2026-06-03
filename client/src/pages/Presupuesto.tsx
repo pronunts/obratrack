@@ -4,11 +4,11 @@
 // Design: Blueprint Engineering
 // ============================================================
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import {
   Upload, FileText, CheckCircle2, AlertTriangle, Download,
   Trash2, ChevronDown, ChevronUp, Building2, FileSpreadsheet,
-  Info, Zap
+  Info, Zap, Pencil, X, Save, RotateCcw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,160 @@ import { parseFile, generateSampleCSVMapreX, generateSampleCSVGenerico } from '@
 import { useApp } from '@/contexts/AppContext';
 import type { PartidaPresupuesto } from '@/lib/types';
 
+// ── Modal de edición de partida ───────────────────────────
+
+function EditarPartidaModal({ partida, onClose }: { partida: PartidaPresupuesto; onClose: () => void }) {
+  const { editarPartida } = useApp();
+  const [descripcion, setDescripcion] = useState(partida.descripcion);
+  const [cantidad, setCantidad]       = useState(String(partida.cantidadPlaneada));
+  const [unidad, setUnidad]           = useState(partida.unidad);
+  const [precio, setPrecio]           = useState(String(partida.precioUnitarioUSD));
+  const [saving, setSaving]           = useState(false);
+  const [errors, setErrors]           = useState<Record<string, string>>({});
+
+  const total = useMemo(() => {
+    const c = parseFloat(cantidad) || 0;
+    const p = parseFloat(precio) || 0;
+    return c * p;
+  }, [cantidad, precio]);
+
+  const fmt = (n: number) =>
+    new Intl.NumberFormat('es-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n);
+
+  const hayOriginal =
+    partida.descripcionOriginal !== undefined ||
+    partida.cantidadPlaneadaOriginal !== undefined ||
+    partida.precioUnitarioUSDOriginal !== undefined;
+
+  const hayDiferencia =
+    descripcion !== (partida.descripcionOriginal ?? partida.descripcion) ||
+    parseFloat(cantidad) !== (partida.cantidadPlaneadaOriginal ?? partida.cantidadPlaneada) ||
+    parseFloat(precio) !== (partida.precioUnitarioUSDOriginal ?? partida.precioUnitarioUSD);
+
+  const handleRevertir = () => {
+    setDescripcion(partida.descripcionOriginal ?? partida.descripcion);
+    setCantidad(String(partida.cantidadPlaneadaOriginal ?? partida.cantidadPlaneada));
+    setPrecio(String(partida.precioUnitarioUSDOriginal ?? partida.precioUnitarioUSD));
+    setErrors({});
+  };
+
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!descripcion.trim()) e.descripcion = 'La descripción no puede estar vacía';
+    if (!cantidad || parseFloat(cantidad) <= 0) e.cantidad = 'Cantidad debe ser mayor a 0';
+    if (!precio || parseFloat(precio) <= 0) e.precio = 'Precio debe ser mayor a 0';
+    return e;
+  };
+
+  const handleGuardar = async () => {
+    const e = validate();
+    if (Object.keys(e).length) { setErrors(e); return; }
+    setSaving(true);
+    try {
+      await editarPartida({
+        ...partida,
+        descripcion: descripcion.trim(),
+        cantidadPlaneada: parseFloat(cantidad),
+        unidad: unidad.trim() || partida.unidad,
+        precioUnitarioUSD: parseFloat(precio),
+      });
+      toast.success('Partida actualizada correctamente');
+      onClose();
+    } catch {
+      toast.error('Error al guardar');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-2xl">
+        {/* Header */}
+        <div className="flex items-start justify-between p-5 border-b border-border">
+          <div className="min-w-0 flex-1 pr-3">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded text-muted-foreground">{partida.codigo}</span>
+              <Badge variant="outline" className="text-xs">{partida.unidad}</Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">Editando partida</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted transition-colors shrink-0">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Fields */}
+        <div className="p-5 space-y-4">
+          {/* Descripción */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-semibold">Descripción</Label>
+            <Input value={descripcion} onChange={e => { setDescripcion(e.target.value); setErrors(ev => ({ ...ev, descripcion: '' })); }}
+              className="h-12" placeholder="Descripción de la partida" />
+            {partida.descripcionOriginal && partida.descripcionOriginal !== descripcion && (
+              <p className="text-xs text-muted-foreground">Original: <span className="line-through">{partida.descripcionOriginal}</span></p>
+            )}
+            {errors.descripcion && <p className="text-xs text-red-500">{errors.descripcion}</p>}
+          </div>
+
+          {/* Cantidad + Unidad */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2 space-y-1.5">
+              <Label className="text-sm font-semibold">Cantidad Planeada</Label>
+              <Input type="number" value={cantidad} min="0.001" step="0.001"
+                onChange={e => { setCantidad(e.target.value); setErrors(ev => ({ ...ev, cantidad: '' })); }}
+                className="h-12 font-mono text-lg text-center" />
+              {partida.cantidadPlaneadaOriginal !== undefined && partida.cantidadPlaneadaOriginal !== parseFloat(cantidad) && (
+                <p className="text-xs text-muted-foreground">Original: <span className="line-through">{partida.cantidadPlaneadaOriginal.toLocaleString()}</span></p>
+              )}
+              {errors.cantidad && <p className="text-xs text-red-500">{errors.cantidad}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-semibold">Unidad</Label>
+              <Input value={unidad} onChange={e => setUnidad(e.target.value)} className="h-12 font-mono text-center" maxLength={8} />
+            </div>
+          </div>
+
+          {/* Precio Unitario */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-semibold">Precio Unitario USD</Label>
+            <Input type="number" value={precio} min="0.01" step="0.01"
+              onChange={e => { setPrecio(e.target.value); setErrors(ev => ({ ...ev, precio: '' })); }}
+              className="h-12 font-mono text-lg text-center" />
+            {partida.precioUnitarioUSDOriginal !== undefined && partida.precioUnitarioUSDOriginal !== parseFloat(precio) && (
+              <p className="text-xs text-muted-foreground">Original: <span className="line-through">{fmt(partida.precioUnitarioUSDOriginal)}</span></p>
+            )}
+            {errors.precio && <p className="text-xs text-red-500">{errors.precio}</p>}
+          </div>
+
+          {/* Total calculado */}
+          <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Total USD (calculado)</span>
+            <span className="text-lg font-bold tabular-nums text-primary">{fmt(total)}</span>
+          </div>
+        </div>
+
+        {/* Botones */}
+        <div className="px-5 pb-5 flex gap-2">
+          {hayOriginal && hayDiferencia && (
+            <button onClick={handleRevertir}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 text-sm font-medium hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors shrink-0">
+              <RotateCcw className="w-3.5 h-3.5" />Revertir
+            </button>
+          )}
+          <Button variant="outline" className="flex-1 h-12" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button className="flex-1 h-12 font-bold" onClick={handleGuardar} disabled={saving}>
+            {saving
+              ? <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              : <><Save className="w-4 h-4 mr-2" />Guardar</>
+            }
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const CHAPTER_COLORS = [
   'border-l-blue-600', 'border-l-orange-500', 'border-l-emerald-600',
   'border-l-violet-600', 'border-l-amber-500', 'border-l-rose-600',
@@ -28,6 +182,7 @@ const getChapterColor = (idx: number) => CHAPTER_COLORS[idx % CHAPTER_COLORS.len
 
 export default function Presupuesto() {
   const { state, proyectoActivo, importarPresupuesto, dispatch } = useApp();
+  const [partidaAEditar, setPartidaAEditar] = useState<PartidaPresupuesto | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
@@ -384,9 +539,18 @@ export default function Presupuesto() {
                               <span>PU: {fmt(p.precioUnitarioUSD)}</span>
                             </div>
                           </div>
-                          <span className="text-sm font-bold tabular-nums text-foreground shrink-0">
-                            {fmt(p.precioTotalUSD)}
-                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-sm font-bold tabular-nums text-foreground">
+                              {fmt(p.precioTotalUSD)}
+                            </span>
+                            <button
+                              onClick={() => setPartidaAEditar(p)}
+                              className="p-2 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                              title="Editar partida"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -396,6 +560,10 @@ export default function Presupuesto() {
             })}
           </div>
         </div>
+      )}
+
+      {partidaAEditar && (
+        <EditarPartidaModal partida={partidaAEditar} onClose={() => setPartidaAEditar(null)} />
       )}
     </div>
   );
