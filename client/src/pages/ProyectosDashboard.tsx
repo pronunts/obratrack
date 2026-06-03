@@ -31,7 +31,7 @@ function NuevoProyectoForm({ onClose, onCreated }: NuevoProyectoFormProps) {
   const [ubicacion, setUbicacion] = useState('');
   const [fechaInicio, setFechaInicio] = useState(new Date().toISOString().split('T')[0]);
   const [monedaLocal, setMonedaLocal] = useState('COP');
-  const [tasaCambio, setTasaCambio] = useState(4000);
+  const [tasaCambio, setTasaCambio] = useState('4000');
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -45,7 +45,7 @@ function NuevoProyectoForm({ onClose, onCreated }: NuevoProyectoFormProps) {
         ubicacion: ubicacion.trim() || undefined,
         fechaInicio,
         monedaLocal: monedaLocal.toUpperCase(),
-        tasaCambioDefault: tasaCambio,
+        tasaCambioDefault: Number(tasaCambio) || 0,
       });
       await seleccionarProyecto(proyecto.id);
       toast.success(`✓ Proyecto "${proyecto.nombre}" creado`);
@@ -131,7 +131,7 @@ function NuevoProyectoForm({ onClose, onCreated }: NuevoProyectoFormProps) {
               <Input
                 type="number"
                 value={tasaCambio}
-                onChange={e => setTasaCambio(Number(e.target.value))}
+                onChange={e => setTasaCambio(e.target.value)}
                 className="h-11 font-mono"
               />
             </div>
