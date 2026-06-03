@@ -48,9 +48,14 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
     setSyncing(true);
     try {
       await sincronizar();
-      toast.success('✓ Sincronización completada');
-    } catch {
-      toast.error('Error al sincronizar');
+      toast.success('Sincronización completada', {
+        description: 'Datos actualizados desde el servidor',
+      });
+    } catch (err: any) {
+      console.error('[Sync]', err);
+      toast.error('Error al sincronizar', {
+        description: err?.message ?? 'Revisá tu conexión o volvé a intentarlo',
+      });
     } finally {
       setSyncing(false);
     }
@@ -121,15 +126,23 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
             )}
           </div>
 
-          {/* Botón sincronizar */}
-          {state.pendientesSincronizacion > 0 && (
+          {/* Botón sincronizar — siempre visible cuando hay conexión */}
+          {state.isOnline && (
             <button
               onClick={handleSync}
-              disabled={syncing || !state.isOnline}
-              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+              disabled={syncing}
+              className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl disabled:opacity-50 text-sm font-semibold transition-colors
+                ${state.pendientesSincronizacion > 0
+                  ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                  : 'bg-sidebar-accent hover:bg-sidebar-accent/80 text-sidebar-foreground/70 hover:text-sidebar-foreground'
+                }`}
             >
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Sincronizando...' : 'Sincronizar Ahora'}
+              {syncing
+                ? 'Sincronizando...'
+                : state.pendientesSincronizacion > 0
+                  ? `Sincronizar (${state.pendientesSincronizacion} pend.)`
+                  : 'Sincronizar'}
             </button>
           )}
 

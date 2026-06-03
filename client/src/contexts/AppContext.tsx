@@ -304,6 +304,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
 
+
   // ── Getter: proyecto activo ───────────────────────────
   const proyectoActivo = state.proyectos.find(p => p.id === state.proyectoActivoId) ?? null;
 
@@ -365,28 +366,51 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [state, getResumenPartidas]);
 
-  // ── Auto-sync silencioso tras mutaciones ─────────────
-  // Sube inmediatamente al server cuando hay conexión.
-  // Falla en silencio: los datos están seguros en IndexedDB y
-  // el banner de sync manual los cubre cuando vuelva la red.
+  // ── Auto-sync completo tras mutaciones ───────────────
+  // Sube pendientes al server Y baja lo que otros dispositivos subieron.
+  // Así cualquier cambio registrado en otro dispositivo llega en el mismo ciclo.
 
   const autoSyncIfOnline = useCallback(async () => {
     if (!navigator.onLine) return;
     try {
       await syncAllToCloud();
-      const [proyectosActualizados, pendientes] = await Promise.all([
-        loadProyectos(),
-        countAllPendientes(),
-      ]);
-      dispatch({ type: 'SET_PROYECTOS', payload: proyectosActualizados });
+      await fetchAllFromCloud();           // ← baja cambios de otros dispositivos
+    } catch {
+      // Sin red o error de servidor — el banner de sync manual lo cubre
+    }
+    // Recarga estado desde IndexedDB sin importar si el sync falló parcialmente
+    try {
+      const proyectos = await loadProyectos();
+      dispatch({ type: 'SET_PROYECTOS', payload: proyectos });
+
+      const proyectoActivoIdActual = getUIPrefs().proyectoActivoId;
+      if (proyectoActivoIdActual && proyectos.some(p => p.id === proyectoActivoIdActual)) {
+        const data = await loadProyectoData(proyectoActivoIdActual);
+        dispatch({ type: 'SET_PROYECTO_ACTIVO', payload: { id: proyectoActivoIdActual, ...data } });
+      }
+
+      const pendientes = await countAllPendientes();
       dispatch({ type: 'SET_PENDIENTES', payload: pendientes });
       const now = new Date().toISOString();
       localStorage.setItem('obratrack_ultima_sync', now);
       dispatch({ type: 'SET_ULTIMA_SINCRONIZACION', payload: now });
     } catch {
-      // Sin red o error de servidor — el banner de sync manual lo resuelve
+      // Error leyendo IndexedDB — no bloqueante
     }
   }, []);
+
+  // ── Sync al volver el foco al tab ─────────────────────
+  // Si PC tiene el tab abierto y el teléfono hizo cambios,
+  // al volver a la ventana de PC se descarga el estado fresco.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        autoSyncIfOnline();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [autoSyncIfOnline]);
 
   // ── Acciones de Proyectos ─────────────────────────────
 
