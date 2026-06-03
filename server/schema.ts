@@ -68,6 +68,18 @@ export const gastos = sqliteTable('gastos', {
   creadoEn: text('creado_en').notNull(),
 });
 
+export const imagenesObra = sqliteTable('imagenes_obra', {
+  id:          text('id').primaryKey(),
+  proyectoId:  text('proyecto_id').notNull(),
+  userId:      integer('user_id').notNull().references(() => users.id),
+  nombre:      text('nombre').notNull(),
+  descripcion: text('descripcion'),
+  fecha:       text('fecha').notNull(),
+  ubicacion:   text('ubicacion'),
+  dataUrl:     text('data_url').notNull(),
+  creadoEn:    text('creado_en').notNull(),
+});
+
 // shares_v2: live data — el GET siempre computa desde la DB en vivo
 export const shares = sqliteTable('shares_v2', {
   id:         text('id').primaryKey(),

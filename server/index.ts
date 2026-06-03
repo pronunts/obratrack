@@ -10,26 +10,20 @@ import { authRouter } from './routes/auth.js';
 import { feedbackRouter } from './routes/feedback.js';
 import { syncRouter } from './routes/sync.js';
 import { sharesRouter } from './routes/shares.js';
+import { imagesRouter } from './routes/images.js';
 
 async function startServer() {
   const app = express();
   const server = createServer(app);
 
-  app.use(express.json({ limit: '10mb' }));
+  app.use(express.json({ limit: '20mb' }));
 
-  // Mount auth routes
   app.use('/api/auth', authRouter);
-
-  // Mount feedback route
   app.use('/api/feedback', feedbackRouter);
-
-  // Mount sync route (data persistence cross-device)
   app.use('/api/sync', syncRouter);
-
-  // Mount shares route (public read, protected write)
   app.use('/api/shares', sharesRouter);
+  app.use('/api/images', imagesRouter);
 
-  // Serve static files from dist/public in production
   const staticPath =
     process.env.NODE_ENV === "production"
       ? path.resolve(__dirname, "public")
@@ -37,7 +31,6 @@ async function startServer() {
 
   app.use(express.static(staticPath));
 
-  // Handle client-side routing - serve index.html for all routes
   app.get("*", (_req, res) => {
     res.sendFile(path.join(staticPath, "index.html"));
   });

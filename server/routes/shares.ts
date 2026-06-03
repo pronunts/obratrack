@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { eq, and } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { db } from '../db.js';
-import { shares, proyectos, partidas, ejecuciones, gastos } from '../schema.js';
+import { shares, proyectos, partidas, ejecuciones, gastos, imagenesObra } from '../schema.js';
 import { requireAuth, type AuthRequest } from '../middleware/auth.js';
 
 export const sharesRouter = Router();
@@ -34,6 +34,7 @@ function computeSnapshot(
   allPartidas: any[],
   allEjecuciones: any[],
   allGastos: any[],
+  allImagenes: any[] = [],
 ) {
   const totalPresupuesto = allPartidas.reduce((s: number, p: any) => s + p.precioTotalUSD, 0);
   const totalGastado     = allGastos.reduce((s: number, g: any) => s + g.montoUSD, 0);
@@ -160,7 +161,14 @@ function computeSnapshot(
     },
     curvaData,
     hitos,
-    imagenes: [],            // las imágenes viven en IndexedDB del cliente — no disponibles en el server
+    imagenes: allImagenes.map((img: any) => ({
+      id: img.id,
+      nombre: img.nombre,
+      descripcion: img.descripcion ?? undefined,
+      fecha: img.fecha,
+      ubicacion: img.ubicacion ?? undefined,
+      dataUrl: img.dataUrl,
+    })),
     generadoEn: new Date().toISOString(),
   };
 }
@@ -230,18 +238,19 @@ sharesRouter.get('/:token', async (req, res): Promise<any> => {
 
     const { proyectoId } = rows[0];
 
-    const [proyectoRows, allPartidas, allEjecuciones, allGastos] = await Promise.all([
+    const [proyectoRows, allPartidas, allEjecuciones, allGastos, allImagenes] = await Promise.all([
       db.select().from(proyectos).where(eq(proyectos.id, proyectoId)).limit(1),
       db.select().from(partidas).where(eq(partidas.proyectoId, proyectoId)),
       db.select().from(ejecuciones).where(eq(ejecuciones.proyectoId, proyectoId)),
       db.select().from(gastos).where(eq(gastos.proyectoId, proyectoId)),
+      db.select().from(imagenesObra).where(eq(imagenesObra.proyectoId, proyectoId)),
     ]);
 
     if (!proyectoRows.length) {
       return res.status(404).json({ error: 'Proyecto no encontrado' });
     }
 
-    const snapshot = computeSnapshot(proyectoRows[0], allPartidas, allEjecuciones, allGastos);
+    const snapshot = computeSnapshot(proyectoRows[0], allPartidas, allEjecuciones, allGastos, allImagenes);
 
     res.json({ snapshot, creadoEn: rows[0].creadoEn });
   } catch (err) {

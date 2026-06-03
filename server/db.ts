@@ -100,6 +100,22 @@ client.execute(`
   );
 `);
 
+// Imágenes de obra (sincronizadas al servidor para el link público)
+client.execute(`
+  CREATE TABLE IF NOT EXISTS imagenes_obra (
+    id TEXT PRIMARY KEY,
+    proyecto_id TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    nombre TEXT NOT NULL,
+    descripcion TEXT,
+    fecha TEXT NOT NULL,
+    ubicacion TEXT,
+    data_url TEXT NOT NULL,
+    creado_en TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+`).catch(() => {});
+
 // shares v2: live data (sin snapshot estático)
 client.execute(`
   CREATE TABLE IF NOT EXISTS shares_v2 (

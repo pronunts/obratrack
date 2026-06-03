@@ -1,5 +1,3 @@
-// Utilidades para el cálculo de la Curva S (compartido entre componentes y snapshot)
-
 import type { PartidaPresupuesto, RegistroEjecucion, ShareCurvaPoint } from './types';
 
 const PUNTOS = 24;
@@ -17,8 +15,8 @@ export function generarCurvaPlanificada(
 
   for (let i = 0; i <= PUNTOS; i++) {
     const t = i / PUNTOS;
-    const sigmoid = 1 / (1 + Math.exp(-k * (t - 0.5)));
-    const pct = ((sigmoid - sigMin) / (sigMax - sigMin)) * 100;
+    const s = 1 / (1 + Math.exp(-k * (t - 0.5)));
+    const pct = ((s - sigMin) / (sigMax - sigMin)) * 100;
     const fecha = new Date(inicio.getTime() + duracionMs * t);
     const mes = fecha.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
     resultado.push({ mes, planificado: Math.round(pct * 10) / 10 });
@@ -26,53 +24,11 @@ export function generarCurvaPlanificada(
   return resultado;
 }
 
-/** Calcula el avance real acumulado mes a mes. */
-export function calcularAvanceReal(
-  partidas: PartidaPresupuesto[],
-  ejecuciones: RegistroEjecucion[],
-  inicio: Date,
-  fin: Date,
-): Map<string, number> {
-  const totalPeso = partidas.reduce((s, p) => s + p.precioTotalUSD, 0);
-  if (totalPeso === 0) return new Map();
-
-  const duracionMs = fin.getTime() - inicio.getTime();
-  const porMes = new Map<string, RegistroEjecucion[]>();
-  for (const ej of ejecuciones) {
-    const fecha = new Date(ej.fecha + 'T12:00:00');
-    const clave = fecha.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
-    const lista = porMes.get(clave) ?? [];
-    lista.push(ej);
-    porMes.set(clave, lista);
-  }
-
-  const mesesOrdenados: string[] = [];
-  for (let i = 0; i <= PUNTOS; i++) {
-    const fecha = new Date(inicio.getTime() + duracionMs * (i / PUNTOS));
-    const mes = fecha.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
-    if (!mesesOrdenados.includes(mes)) mesesOrdenados.push(mes);
-  }
-
-  const resultado = new Map<string, number>();
-  const ejecutadoAcumulado = new Map<string, number>();
-
-  for (const mes of mesesOrdenados) {
-    const ejMes = porMes.get(mes) ?? [];
-    for (const ej of ejMes) {
-      ejecutadoAcumulado.set(ej.partidaId, (ejecutadoAcumulado.get(ej.partidaId) ?? 0) + ej.cantidadEjecutada);
-    }
-    let avancePonderado = 0;
-    for (const partida of partidas) {
-      const ejecutado = ejecutadoAcumulado.get(partida.id) ?? 0;
-      const pctPartida = partida.cantidadPlaneada > 0 ? Math.min(ejecutado / partida.cantidadPlaneada, 1) : 0;
-      avancePonderado += pctPartida * (partida.precioTotalUSD / totalPeso);
-    }
-    resultado.set(mes, Math.round(avancePonderado * 1000) / 10);
-  }
-  return resultado;
-}
-
-/** Genera el array combinado para el gráfico. */
+/**
+ * Genera el array combinado planificado + real para el gráfico.
+ * Usa comparación directa por fecha YYYY-MM-DD para evitar problemas
+ * de locale entre Node.js y diferentes browsers.
+ */
 export function buildCurvaData(
   partidas: PartidaPresupuesto[],
   ejecuciones: RegistroEjecucion[],
@@ -86,28 +42,42 @@ export function buildCurvaData(
 
   const duracionMs = fin.getTime() - inicio.getTime();
   const curvaPlan  = generarCurvaPlanificada(inicio, fin);
-  const avanceReal = calcularAvanceReal(partidas, ejecuciones, inicio, fin);
   const hoy        = new Date();
 
-  // Primera fecha con ejecuciones reales (para no dibujar ceros "vacíos" al inicio)
-  const primeraFechaConEjecucion = ejecuciones.length > 0
-    ? ejecuciones.reduce((min, ej) => ej.fecha < min ? ej.fecha : min, ejecuciones[0].fecha)
-    : null;
+  const totalPeso = partidas.reduce((s, p) => s + p.precioTotalUSD, 0);
+
+  // Sin presupuesto o sin ejecuciones → no hay línea real
+  if (totalPeso === 0 || ejecuciones.length === 0) {
+    return curvaPlan.map(p => ({ ...p, real: undefined }));
+  }
 
   return curvaPlan.map(({ mes, planificado }, i) => {
     const fechaPunto = new Date(inicio.getTime() + duracionMs * (i / PUNTOS));
 
-    // Meses futuros: sin dato
+    // Puntos futuros no se dibujan
     if (fechaPunto > hoy) return { mes, planificado, real: undefined };
 
-    // Meses pasados sin ejecuciones todavía: sin dato (no dibujar 0 plano)
-    if (primeraFechaConEjecucion) {
-      const mesStr = fechaPunto.toISOString().slice(0, 7); // YYYY-MM
-      const primerMes = primeraFechaConEjecucion.slice(0, 7);
-      if (mesStr < primerMes) return { mes, planificado, real: undefined };
+    // Todas las ejecuciones hasta esta fecha (YYYY-MM-DD ≤ cutoff)
+    const cutoff = fechaPunto.toISOString().slice(0, 10);
+    const ejHasta = ejecuciones.filter(ej => ej.fecha <= cutoff);
+
+    // Si no hay ejecuciones hasta este punto, no dibujar
+    if (ejHasta.length === 0) return { mes, planificado, real: undefined };
+
+    // Acumular cantidad ejecutada por partida
+    const ejPorPartida = new Map<string, number>();
+    for (const ej of ejHasta) {
+      ejPorPartida.set(ej.partidaId, (ejPorPartida.get(ej.partidaId) ?? 0) + ej.cantidadEjecutada);
     }
 
-    const valor = avanceReal.get(mes);
-    return { mes, planificado, real: valor ?? 0 };
+    // Avance ponderado por presupuesto
+    let avancePonderado = 0;
+    for (const p of partidas) {
+      const ejecutado = ejPorPartida.get(p.id) ?? 0;
+      const pct = p.cantidadPlaneada > 0 ? Math.min(ejecutado / p.cantidadPlaneada, 1) : 0;
+      avancePonderado += pct * (p.precioTotalUSD / totalPeso);
+    }
+
+    return { mes, planificado, real: Math.round(avancePonderado * 1000) / 10 };
   });
 }

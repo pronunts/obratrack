@@ -1,12 +1,37 @@
-// ============================================================
-// ObraTrack — Hook: Imágenes de Obra por Proyecto
-// Carga, agrega y elimina imágenes almacenadas en IndexedDB
-// ============================================================
-
 import { useState, useEffect, useCallback } from 'react';
 import { nanoid } from 'nanoid';
 import type { ImagenObra } from '@/lib/types';
 import { loadImagenes, addImagen as dbAdd, deleteImagen as dbDelete } from '@/lib/db';
+
+function authHeader(): Record<string, string> {
+  const token = localStorage.getItem('obratrack_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function syncImagenToServer(imagen: ImagenObra): Promise<void> {
+  if (!navigator.onLine) return;
+  try {
+    await fetch('/api/images', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeader() },
+      body: JSON.stringify(imagen),
+    });
+  } catch {
+    // Falla silenciosamente — la imagen sigue disponible localmente
+  }
+}
+
+async function deleteImagenFromServer(id: string): Promise<void> {
+  if (!navigator.onLine) return;
+  try {
+    await fetch(`/api/images/${id}`, {
+      method: 'DELETE',
+      headers: authHeader(),
+    });
+  } catch {
+    // Falla silenciosamente
+  }
+}
 
 export function useImagenes(proyectoId: string | null) {
   const [imagenes, setImagenes] = useState<ImagenObra[]>([]);
@@ -44,13 +69,16 @@ export function useImagenes(proyectoId: string | null) {
       creadoEn: new Date().toISOString(),
     };
 
+    // Guardar local + subir al servidor en paralelo
     await dbAdd(nueva);
     setImagenes(prev => [...prev, nueva]);
+    syncImagenToServer(nueva); // fire-and-forget
   }, [proyectoId]);
 
   const eliminarImagen = useCallback(async (id: string) => {
     await dbDelete(id);
     setImagenes(prev => prev.filter(img => img.id !== id));
+    deleteImagenFromServer(id); // fire-and-forget
   }, []);
 
   return { imagenes, cargando, subirImagen, eliminarImagen };
