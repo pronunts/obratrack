@@ -89,14 +89,25 @@ export function buildCurvaData(
   const avanceReal = calcularAvanceReal(partidas, ejecuciones, inicio, fin);
   const hoy        = new Date();
 
-  return curvaPlan.map(({ mes, planificado }, i) => {
-    // La fecha exacta de este punto en el timeline
-    const fechaPunto = new Date(inicio.getTime() + duracionMs * (i / PUNTOS));
-    // Solo mostrar real para puntos que ya ocurrieron (no meses futuros)
-    const real = fechaPunto <= hoy && avanceReal.has(mes)
-      ? avanceReal.get(mes)
-      : undefined;
+  // Primera fecha con ejecuciones reales (para no dibujar ceros "vacíos" al inicio)
+  const primeraFechaConEjecucion = ejecuciones.length > 0
+    ? ejecuciones.reduce((min, ej) => ej.fecha < min ? ej.fecha : min, ejecuciones[0].fecha)
+    : null;
 
-    return { mes, planificado, real };
+  return curvaPlan.map(({ mes, planificado }, i) => {
+    const fechaPunto = new Date(inicio.getTime() + duracionMs * (i / PUNTOS));
+
+    // Meses futuros: sin dato
+    if (fechaPunto > hoy) return { mes, planificado, real: undefined };
+
+    // Meses pasados sin ejecuciones todavía: sin dato (no dibujar 0 plano)
+    if (primeraFechaConEjecucion) {
+      const mesStr = fechaPunto.toISOString().slice(0, 7); // YYYY-MM
+      const primerMes = primeraFechaConEjecucion.slice(0, 7);
+      if (mesStr < primerMes) return { mes, planificado, real: undefined };
+    }
+
+    const valor = avanceReal.get(mes);
+    return { mes, planificado, real: valor ?? 0 };
   });
 }

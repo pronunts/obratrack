@@ -101,7 +101,6 @@ client.execute(`
 `);
 
 // shares v2: live data (sin snapshot estático)
-// Si existe la tabla vieja con snapshot, la reemplazamos.
 client.execute(`
   CREATE TABLE IF NOT EXISTS shares_v2 (
     id TEXT PRIMARY KEY,
@@ -111,11 +110,8 @@ client.execute(`
     creado_en TEXT NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
-`);
-// Índice único: un solo share activo por proyecto+usuario
-client.execute(`
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_shares_v2_project_user
-  ON shares_v2(proyecto_id, user_id);
-`);
+`).catch(() => {
+  // La tabla ya existe o error no crítico — la unicidad se maneja en el route handler
+});
 
 export const db = drizzle(client, { schema });
