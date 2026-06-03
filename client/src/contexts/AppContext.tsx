@@ -364,6 +364,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [state, getResumenPartidas]);
 
+  // ── Auto-sync silencioso tras mutaciones ─────────────
+  // Sube inmediatamente al server cuando hay conexión.
+  // Falla en silencio: los datos están seguros en IndexedDB y
+  // el banner de sync manual los cubre cuando vuelva la red.
+
+  const autoSyncIfOnline = useCallback(async () => {
+    if (!navigator.onLine) return;
+    try {
+      await syncAllToCloud();
+      const pendientes = await countAllPendientes();
+      dispatch({ type: 'SET_PENDIENTES', payload: pendientes });
+      const now = new Date().toISOString();
+      localStorage.setItem('obratrack_ultima_sync', now);
+      dispatch({ type: 'SET_ULTIMA_SINCRONIZACION', payload: now });
+    } catch {
+      // Sin red o error de servidor — el banner de sync manual lo resuelve
+    }
+  }, []);
+
   // ── Acciones de Proyectos ─────────────────────────────
 
   const crearProyecto = useCallback(async (
@@ -379,8 +398,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     await db.proyectos.put(proyecto);
     dispatch({ type: 'ADD_PROYECTO', payload: proyecto });
+    autoSyncIfOnline();
     return proyecto;
-  }, []);
+  }, [autoSyncIfOnline]);
 
   const seleccionarProyecto = useCallback(async (id: string) => {
     const data = await loadProyectoData(id);
@@ -403,7 +423,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const updated = { ...proyecto, actualizadoEn: new Date().toISOString() };
     await db.proyectos.put(updated);
     dispatch({ type: 'UPDATE_PROYECTO', payload: updated });
-  }, []);
+    autoSyncIfOnline();
+  }, [autoSyncIfOnline]);
 
   // ── Importar Presupuesto ──────────────────────────────
 
@@ -459,7 +480,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ejecuciones: state.ejecuciones,
       gastos: state.gastos,
     }});
-  }, [state.proyectoActivoId, state.proyectos, state.ejecuciones, state.gastos]);
+    autoSyncIfOnline();
+  }, [state.proyectoActivoId, state.proyectos, state.ejecuciones, state.gastos, autoSyncIfOnline]);
 
   // ── Acciones de Ejecución ─────────────────────────────
 
@@ -482,7 +504,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     await db.ejecuciones.put(ejecucion);
     dispatch({ type: 'ADD_EJECUCION', payload: ejecucion });
-  }, [state.proyectoActivoId]);
+    autoSyncIfOnline();
+  }, [state.proyectoActivoId, autoSyncIfOnline]);
 
   const eliminarEjecucion = useCallback(async (id: string) => {
     await db.ejecuciones.delete(id);
@@ -518,7 +541,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     await db.gastos.put(gasto);
     dispatch({ type: 'ADD_GASTO', payload: gasto });
-  }, [state.proyectoActivoId]);
+    autoSyncIfOnline();
+  }, [state.proyectoActivoId, autoSyncIfOnline]);
 
   const eliminarGasto = useCallback(async (id: string) => {
     await db.gastos.delete(id);
