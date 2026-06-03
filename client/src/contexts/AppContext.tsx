@@ -373,7 +373,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!navigator.onLine) return;
     try {
       await syncAllToCloud();
-      const pendientes = await countAllPendientes();
+      const [proyectosActualizados, pendientes] = await Promise.all([
+        loadProyectos(),
+        countAllPendientes(),
+      ]);
+      dispatch({ type: 'SET_PROYECTOS', payload: proyectosActualizados });
       dispatch({ type: 'SET_PENDIENTES', payload: pendientes });
       const now = new Date().toISOString();
       localStorage.setItem('obratrack_ultima_sync', now);
