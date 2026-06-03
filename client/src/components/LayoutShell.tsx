@@ -7,7 +7,7 @@ import { useLocation } from 'wouter';
 import { Link } from 'wouter';
 import {
   LayoutDashboard, FileSpreadsheet, HardHat, DollarSign,
-  Moon, Sun, Wifi, WifiOff, RefreshCw, Building2, LogOut
+  Moon, Sun, Wifi, WifiOff, RefreshCw, Building2, LogOut, Eye
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useApp } from '@/contexts/AppContext';
@@ -30,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/presupuesto', label: 'Línea Base', icon: FileSpreadsheet },
   { href: '/ejecucion', label: 'Ejecución', icon: HardHat },
   { href: '/costos', label: 'Costos', icon: DollarSign },
+  { href: '/cliente', label: 'Vista Cliente', icon: Eye },
 ];
 
 export function LayoutShell({ children }: { children: React.ReactNode }) {

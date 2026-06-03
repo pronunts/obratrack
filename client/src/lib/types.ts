@@ -107,6 +107,19 @@ export interface ResumenProyecto {
   ultimaActividad?: string; // ISO timestamp
 }
 
+// ── Imágenes de Obra ─────────────────────────────────────
+
+export interface ImagenObra {
+  id: string;
+  proyectoId: string;
+  nombre: string;
+  descripcion?: string;
+  fecha: string;        // YYYY-MM-DD
+  ubicacion?: string;
+  dataUrl: string;      // base64 data URL (almacenado en IndexedDB)
+  creadoEn: string;     // ISO timestamp
+}
+
 // ── Resultado del Parser ──────────────────────────────────
 
 export interface ParseResult {

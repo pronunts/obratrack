@@ -18,6 +18,7 @@ import type {
   PartidaPresupuesto,
   RegistroEjecucion,
   GastoDiario,
+  ImagenObra,
   SyncResult,
   CloudSyncService,
 } from './types';
@@ -29,16 +30,24 @@ export class ObraTrackDB extends Dexie {
   partidas!: Table<PartidaPresupuesto, string>;
   ejecuciones!: Table<RegistroEjecucion, string>;
   gastos!: Table<GastoDiario, string>;
+  imagenes!: Table<ImagenObra, string>;
 
   constructor() {
     super('ObraTrackDB');
 
     this.version(1).stores({
-      // Índices: clave primaria + campos para queries frecuentes
       proyectos:   '&id, nombre, creadoEn, sincronizado',
       partidas:    '&id, proyectoId, capitulo, codigo, sincronizado',
       ejecuciones: '&id, proyectoId, partidaId, fecha, sincronizado, creadoEn',
       gastos:      '&id, proyectoId, partidaId, fecha, sincronizado, creadoEn',
+    });
+
+    this.version(2).stores({
+      proyectos:   '&id, nombre, creadoEn, sincronizado',
+      partidas:    '&id, proyectoId, capitulo, codigo, sincronizado',
+      ejecuciones: '&id, proyectoId, partidaId, fecha, sincronizado, creadoEn',
+      gastos:      '&id, proyectoId, partidaId, fecha, sincronizado, creadoEn',
+      imagenes:    '&id, proyectoId, fecha, creadoEn',
     });
   }
 }
@@ -273,6 +282,25 @@ export async function descartarTodosLosPendientes(): Promise<number> {
   });
 
   return count;
+}
+
+// ── Imágenes de Obra ─────────────────────────────────────
+
+export async function loadImagenes(proyectoId: string): Promise<ImagenObra[]> {
+  return db.imagenes.where('proyectoId').equals(proyectoId).sortBy('fecha');
+}
+
+export async function addImagen(imagen: ImagenObra): Promise<void> {
+  await db.imagenes.put(imagen);
+}
+
+export async function deleteImagen(id: string): Promise<void> {
+  await db.imagenes.delete(id);
+}
+
+/** Elimina todas las imágenes de un proyecto (llamado al eliminar el proyecto) */
+export async function deleteImagenesProyecto(proyectoId: string): Promise<void> {
+  await db.imagenes.where('proyectoId').equals(proyectoId).delete();
 }
 
 // ── Servicio legacy (mantenido por compatibilidad interna) ────────────────────

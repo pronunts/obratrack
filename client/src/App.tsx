@@ -20,6 +20,7 @@ import Presupuesto from './pages/Presupuesto';
 import Ejecucion from './pages/Ejecucion';
 import Costos from './pages/Costos';
 import Dashboard from './pages/Dashboard';
+import DashboardCliente from './pages/DashboardCliente';
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
 import { OfflineBanner } from './components/OfflineBanner';
 
@@ -52,6 +53,7 @@ function Router() {
             <Route path="/presupuesto" component={() => <ProtectedRoute component={Presupuesto} />} />
             <Route path="/ejecucion" component={() => <ProtectedRoute component={Ejecucion} />} />
             <Route path="/costos" component={() => <ProtectedRoute component={Costos} />} />
+            <Route path="/cliente" component={() => <ProtectedRoute component={DashboardCliente} />} />
             <Route path="/404" component={NotFound} />
             <Route component={NotFound} />
           </Switch>
