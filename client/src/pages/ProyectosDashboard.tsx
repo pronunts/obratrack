@@ -7,7 +7,7 @@ import { useState } from 'react';
 import {
   Plus, Building2, ChevronRight, Trash2, FolderOpen,
   Calendar, DollarSign, Layers, Clock, CheckCircle2,
-  AlertTriangle, WifiOff, Wifi, X, Pencil
+  AlertTriangle, WifiOff, Wifi, X, Pencil, MapPin, User, Phone
 } from 'lucide-react';
 import { EditarProyectoModal } from '@/components/EditarProyectoModal';
 import { Button } from '@/components/ui/button';
@@ -25,33 +25,54 @@ interface NuevoProyectoFormProps {
   onCreated: (id: string) => void;
 }
 
+const MONEDAS = ['COP', 'PEN', 'BOB', 'ARS', 'CLP', 'MXN', 'VES', 'USD'];
+
 function NuevoProyectoForm({ onClose, onCreated }: NuevoProyectoFormProps) {
   const { crearProyecto, seleccionarProyecto } = useApp();
-  const [nombre, setNombre] = useState('');
-  const [descripcion, setDescripcion] = useState('');
-  const [ubicacion, setUbicacion] = useState('');
-  const [fechaInicio, setFechaInicio] = useState(new Date().toISOString().split('T')[0]);
-  const [monedaLocal, setMonedaLocal] = useState('COP');
-  const [tasaCambio, setTasaCambio] = useState('4000');
-  const [saving, setSaving] = useState(false);
+  const [nombre, setNombre]             = useState('');
+  const [descripcion, setDescripcion]   = useState('');
+  const [ubicacion, setUbicacion]       = useState('');
+  const [cliente, setCliente]           = useState('');
+  const [ingenieroRes, setIngRes]       = useState('');
+  const [contacto, setContacto]         = useState('');
+  const [fechaInicio, setFechaInicio]   = useState(new Date().toISOString().split('T')[0]);
+  const [fechaFin, setFechaFin]         = useState('');
+  const [monedaLocal, setMonedaLocal]   = useState('COP');
+  const [tasaCambio, setTasaCambio]     = useState('4000');
+  const [saving, setSaving]             = useState(false);
+  const [errors, setErrors]             = useState<Record<string, string>>({});
+
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!nombre.trim()) e.nombre = 'El nombre es requerido';
+    if (fechaFin && fechaFin < fechaInicio) e.fechaFin = 'La fecha fin debe ser igual o posterior a la de inicio';
+    const tc = Number(tasaCambio);
+    if (isNaN(tc) || tc <= 0) e.tasaCambio = 'Tasa de cambio inválida';
+    return e;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nombre.trim()) { toast.error('El nombre del proyecto es requerido'); return; }
+    const errs = validate();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
     setSaving(true);
     try {
       const proyecto = await crearProyecto({
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || undefined,
         ubicacion: ubicacion.trim() || undefined,
+        cliente: cliente.trim() || undefined,
+        ingenieroResidente: ingenieroRes.trim() || undefined,
+        contacto: contacto.trim() || undefined,
         fechaInicio,
+        fechaFin: fechaFin || undefined,
         monedaLocal: monedaLocal.toUpperCase(),
-        tasaCambioDefault: Number(tasaCambio) || 0,
+        tasaCambioDefault: Number(tasaCambio),
       });
       await seleccionarProyecto(proyecto.id);
       toast.success(`✓ Proyecto "${proyecto.nombre}" creado`);
       onCreated(proyecto.id);
-    } catch (err) {
+    } catch {
       toast.error('Error al crear el proyecto');
     } finally {
       setSaving(false);
@@ -60,8 +81,10 @@ function NuevoProyectoForm({ onClose, onCreated }: NuevoProyectoFormProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-border sticky top-0 bg-card">
+      <div className="bg-card border border-border rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
+
+        {/* Header fijo */}
+        <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <Building2 className="w-4 h-4 text-primary" />
@@ -73,69 +96,107 @@ function NuevoProyectoForm({ onClose, onCreated }: NuevoProyectoFormProps) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        {/* Cuerpo scrolleable */}
+        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 p-5 space-y-4">
+
+          {/* Nombre */}
           <div className="space-y-1.5">
-            <Label className="text-sm font-semibold">Nombre del Proyecto *</Label>
-            <Input
-              value={nombre}
-              onChange={e => setNombre(e.target.value)}
-              placeholder="Ej. Construcción Puente Km 45"
-              className="h-12"
-              autoFocus
-              required
-            />
+            <Label className="text-sm font-semibold flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5" />Nombre del Proyecto *
+            </Label>
+            <Input value={nombre} onChange={e => { setNombre(e.target.value); setErrors(ev => ({ ...ev, nombre: '' })); }}
+              placeholder="Ej. Construcción Puente Km 45" className="h-12" autoFocus />
+            {errors.nombre && <p className="text-xs text-red-500">{errors.nombre}</p>}
           </div>
 
+          {/* Descripción */}
           <div className="space-y-1.5">
-            <Label className="text-sm font-medium">Descripción</Label>
-            <Input
-              value={descripcion}
-              onChange={e => setDescripcion(e.target.value)}
-              placeholder="Descripción breve del proyecto"
-              className="h-11"
-            />
+            <Label className="text-sm font-medium">Descripción General</Label>
+            <textarea value={descripcion} onChange={e => setDescripcion(e.target.value)} rows={2}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="Alcance general del proyecto..." />
           </div>
 
+          {/* Ubicación */}
           <div className="space-y-1.5">
-            <Label className="text-sm font-medium">Ubicación</Label>
-            <Input
-              value={ubicacion}
-              onChange={e => setUbicacion(e.target.value)}
-              placeholder="Ej. Km 45, Vía Bogotá-Medellín"
-              className="h-11"
-            />
+            <Label className="text-sm font-medium flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5" />Dirección / Ubicación
+            </Label>
+            <Input value={ubicacion} onChange={e => setUbicacion(e.target.value)}
+              placeholder="Ej. Km 45, Vía Bogotá-Medellín" className="h-11" />
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-sm font-medium">Fecha de Inicio</Label>
-            <Input
-              type="date"
-              value={fechaInicio}
-              onChange={e => setFechaInicio(e.target.value)}
-              className="h-11"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
+          {/* Cliente e Ingeniero */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Moneda Local</Label>
-              <Input
-                value={monedaLocal}
-                onChange={e => setMonedaLocal(e.target.value.toUpperCase())}
-                placeholder="COP, PEN, BOB..."
-                maxLength={5}
-                className="h-11 font-mono"
-              />
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5" />Cliente / Propietario
+              </Label>
+              <Input value={cliente} onChange={e => setCliente(e.target.value)}
+                placeholder="Nombre del cliente" className="h-11" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Tasa (Local/USD)</Label>
-              <Input
-                type="number"
-                value={tasaCambio}
-                onChange={e => setTasaCambio(e.target.value)}
-                className="h-11 font-mono"
-              />
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5" />Ingeniero Residente
+              </Label>
+              <Input value={ingenieroRes} onChange={e => setIngRes(e.target.value)}
+                placeholder="Nombre del ingeniero" className="h-11" />
             </div>
+          </div>
+
+          {/* Contacto */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium flex items-center gap-1.5">
+              <Phone className="w-3.5 h-3.5" />Contacto del Ingeniero
+            </Label>
+            <Input value={contacto} onChange={e => setContacto(e.target.value)}
+              placeholder="Email o teléfono (opcional)" className="h-11" />
+          </div>
+
+          {/* Fechas */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5" />Fecha de Inicio *
+              </Label>
+              <Input type="date" value={fechaInicio}
+                onChange={e => { setFechaInicio(e.target.value); setErrors(ev => ({ ...ev, fechaFin: '' })); }}
+                className="h-11" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5" />Fecha Fin Planeada
+              </Label>
+              <Input type="date" value={fechaFin}
+                onChange={e => { setFechaFin(e.target.value); setErrors(ev => ({ ...ev, fechaFin: '' })); }}
+                className="h-11" />
+              {errors.fechaFin && <p className="text-xs text-red-500">{errors.fechaFin}</p>}
+            </div>
+          </div>
+
+          {/* Moneda */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium flex items-center gap-1.5">
+              <DollarSign className="w-3.5 h-3.5" />Moneda Local
+            </Label>
+            <div className="flex gap-1.5 flex-wrap">
+              {MONEDAS.map(m => (
+                <button key={m} type="button" onClick={() => setMonedaLocal(m)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors
+                    ${monedaLocal === m ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted'}`}>
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Tasa */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">Tasa de Cambio (Local / USD)</Label>
+            <Input type="number" value={tasaCambio} min="0.0001" step="0.01"
+              onChange={e => { setTasaCambio(e.target.value); setErrors(ev => ({ ...ev, tasaCambio: '' })); }}
+              placeholder="Ej. 4200" className="h-11 font-mono" />
+            {errors.tasaCambio && <p className="text-xs text-red-500">{errors.tasaCambio}</p>}
           </div>
 
           <div className="flex gap-3 pt-2">
