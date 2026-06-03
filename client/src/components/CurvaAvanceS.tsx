@@ -98,7 +98,32 @@ export function CurvaAvanceS(props: Props) {
               label={{ value: 'Hoy', fill: '#f59e0b', fontSize: 10, position: 'insideTopLeft' }} />
           )}
           <Area type="monotone" dataKey="planificado" name="Planificado" stroke="#64748b" strokeDasharray="6 3" strokeWidth={2} fill="url(#gradPlan)" dot={false} activeDot={{ r: 4, fill: '#64748b' }} />
-          <Area type="monotone" dataKey="real" name="Real" stroke="#22c55e" strokeWidth={2.5} fill="url(#gradReal)" dot={false} connectNulls={false} activeDot={{ r: 5, fill: '#22c55e' }} />
+          <Area
+            type="monotone"
+            dataKey="real"
+            name="Real"
+            stroke="#22c55e"
+            strokeWidth={2.5}
+            fill="url(#gradReal)"
+            connectNulls={false}
+            activeDot={{ r: 6, fill: '#22c55e' }}
+            // Muestra dot en cada punto con dato — imprescindible cuando
+            // el proyecto es nuevo y solo hay 1-2 puntos (sin dot no se ve nada)
+            dot={(props: any) => {
+              if (props.payload?.real === undefined) return <g key={props.key} />;
+              return (
+                <circle
+                  key={props.key}
+                  cx={props.cx}
+                  cy={props.cy}
+                  r={4}
+                  fill="#22c55e"
+                  stroke="#0f172a"
+                  strokeWidth={1.5}
+                />
+              );
+            }}
+          />
         </AreaChart>
       </ResponsiveContainer>
     </div>
