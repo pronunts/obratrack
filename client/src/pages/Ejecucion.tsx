@@ -6,8 +6,8 @@
 import { useState, useMemo, useRef } from 'react';
 import {
   Search, Plus, CheckCircle2, Clock, Wifi, WifiOff,
-  ChevronDown, ChevronUp, Calendar, Hash, Layers,
-  FileText, Edit2, Trash2, X, Save
+  ChevronDown, ChevronUp, Calendar, Layers,
+  FileText, Pencil, Trash2, X, Save
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,163 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useApp } from '@/contexts/AppContext';
-import type { PartidaPresupuesto } from '@/lib/types';
+import type { PartidaPresupuesto, RegistroEjecucion } from '@/lib/types';
+
+// ── Modal de edición de registro de ejecución ────────────
+
+interface EditarEjecucionProps {
+  ejecucion: RegistroEjecucion;
+  partida: PartidaPresupuesto;
+  onClose: () => void;
+}
+
+function EditarEjecucionModal({ ejecucion, partida, onClose }: EditarEjecucionProps) {
+  const { editarEjecucion, state } = useApp();
+  const [cantidad, setCantidad] = useState(String(ejecucion.cantidadEjecutada));
+  const [fecha, setFecha]       = useState(ejecucion.fecha);
+  const [obs, setObs]           = useState(ejecucion.observaciones ?? '');
+  const [saving, setSaving]     = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const fmt = (n: number) => n.toLocaleString('es-US', { maximumFractionDigits: 2 });
+
+  // Total ejecutado SIN este registro (para calcular el margen disponible)
+  const otrosEjecutados = state.ejecuciones
+    .filter(e => e.partidaId === partida.id && e.id !== ejecucion.id)
+    .reduce((s, e) => s + e.cantidadEjecutada, 0);
+  const maxPermitido = Math.max(0, partida.cantidadPlaneada - otrosEjecutados);
+  const pctSinEste = partida.cantidadPlaneada > 0
+    ? Math.min((otrosEjecutados / partida.cantidadPlaneada) * 100, 100)
+    : 0;
+
+  const handleGuardar = async () => {
+    const cant = parseFloat(cantidad);
+    if (!cant || cant <= 0) {
+      toast.error('La cantidad debe ser mayor a 0');
+      inputRef.current?.focus();
+      return;
+    }
+    if (cant > maxPermitido) {
+      toast.error('Supera el máximo permitido', {
+        description: `Con los otros registros, podés asignar hasta ${fmt(maxPermitido)} ${partida.unidad}`,
+      });
+      inputRef.current?.focus();
+      return;
+    }
+    setSaving(true);
+    try {
+      await editarEjecucion(ejecucion.id, cant, fecha, obs.trim() || undefined);
+      toast.success(`✓ Registro actualizado: ${fmt(cant)} ${partida.unidad}`);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-2xl">
+
+        {/* Header */}
+        <div className="flex items-start justify-between p-5 border-b border-border">
+          <div className="flex-1 min-w-0 pr-3">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded text-muted-foreground">
+                {partida.codigo}
+              </span>
+              <Badge variant="outline" className="text-xs">{partida.unidad}</Badge>
+            </div>
+            <p className="font-semibold text-sm leading-snug">{partida.descripcion}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Editando registro del {ejecucion.fecha}</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted transition-colors shrink-0">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Contexto — otros registros */}
+        {otrosEjecutados > 0 && (
+          <div className="px-5 pt-4">
+            <div className="bg-muted/50 rounded-xl p-3 space-y-1.5">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Otros registros: <span className="font-semibold text-foreground tabular-nums">{fmt(otrosEjecutados)} {partida.unidad}</span></span>
+                <span className="font-semibold tabular-nums">{pctSinEste.toFixed(1)}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary/40 transition-all"
+                  style={{ width: `${Math.min(pctSinEste, 100)}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Podés editar este registro hasta <span className="font-semibold text-foreground tabular-nums">{fmt(maxPermitido)} {partida.unidad}</span>
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Form */}
+        <div className="p-5 space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-cantidad" className="text-sm font-semibold">
+              Cantidad Ejecutada ({partida.unidad})
+            </Label>
+            <Input
+              ref={inputRef}
+              id="edit-cantidad"
+              type="number"
+              step="0.01"
+              min="0.01"
+              max={maxPermitido}
+              value={cantidad}
+              onChange={e => setCantidad(e.target.value)}
+              className="h-14 text-xl font-bold text-center tabular-nums"
+              autoFocus
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-fecha" className="text-sm font-medium flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5" />Fecha de Ejecución
+            </Label>
+            <Input
+              id="edit-fecha"
+              type="date"
+              value={fecha}
+              onChange={e => setFecha(e.target.value)}
+              className="h-12 text-base"
+              required
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-obs" className="text-sm font-medium">Observaciones (opcional)</Label>
+            <Input
+              id="edit-obs"
+              value={obs}
+              onChange={e => setObs(e.target.value)}
+              placeholder="Condiciones del terreno, incidentes..."
+              className="h-12"
+            />
+          </div>
+        </div>
+
+        {/* Botones */}
+        <div className="px-5 pb-5 flex gap-3">
+          <Button variant="outline" className="flex-1 h-12" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button className="flex-1 h-12 font-bold" onClick={handleGuardar} disabled={saving}>
+            {saving
+              ? <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              : <><Save className="w-4 h-4 mr-2" />Guardar</>
+            }
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ProgressRing({ pct, size = 48 }: { pct: number; size?: number }) {
   const r = (size - 6) / 2;
@@ -213,6 +369,7 @@ export default function Ejecucion() {
   const [selectedChapter, setSelectedChapter] = useState<string>('');
   const [selectedPartida, setSelectedPartida] = useState<PartidaPresupuesto | null>(null);
   const [expandedPartida, setExpandedPartida] = useState<string | null>(null);
+  const [ejecucionAEditar, setEjecucionAEditar] = useState<{ ej: RegistroEjecucion; partida: PartidaPresupuesto } | null>(null);
   const [syncing, setSyncing] = useState(false);
 
   const resumenes = getResumenPartidas();
@@ -484,6 +641,13 @@ export default function Ejecucion() {
                               <Clock className="w-4 h-4 text-amber-500" />
                             )}
                             <button
+                              className="p-1.5 rounded hover:bg-primary/10 hover:text-primary transition-colors"
+                              title="Editar registro"
+                              onClick={() => setEjecucionAEditar({ ej, partida: p })}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
                               className="p-1.5 rounded hover:bg-destructive/10 hover:text-destructive transition-colors"
                               onClick={() => {
                                 dispatch({ type: 'DELETE_EJECUCION', payload: ej.id });
@@ -509,6 +673,15 @@ export default function Ejecucion() {
         <RegistroForm
           partida={selectedPartida}
           onClose={() => setSelectedPartida(null)}
+        />
+      )}
+
+      {/* Modal de edición */}
+      {ejecucionAEditar && (
+        <EditarEjecucionModal
+          ejecucion={ejecucionAEditar.ej}
+          partida={ejecucionAEditar.partida}
+          onClose={() => setEjecucionAEditar(null)}
         />
       )}
     </div>

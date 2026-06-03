@@ -203,6 +203,7 @@ interface AppContextValue {
   editarPartida: (partida: PartidaPresupuesto) => Promise<void>;
   // Acciones de ejecución
   registrarEjecucion: (partidaId: string, cantidad: number, fecha: string, observaciones?: string) => Promise<void>;
+  editarEjecucion: (id: string, cantidad: number, fecha: string, observaciones?: string) => Promise<void>;
   eliminarEjecucion: (id: string) => Promise<void>;
   // Acciones de gastos
   editarGasto: (gasto: GastoDiario) => Promise<void>;
@@ -543,6 +544,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     autoSyncIfOnline();
   }, [state.proyectoActivoId, autoSyncIfOnline]);
 
+  const editarEjecucion = useCallback(async (
+    id: string,
+    cantidad: number,
+    fecha: string,
+    observaciones?: string,
+  ) => {
+    const existing = state.ejecuciones.find(e => e.id === id);
+    if (!existing) return;
+    const updated: RegistroEjecucion = {
+      ...existing,
+      cantidadEjecutada: cantidad,
+      fecha,
+      observaciones,
+      sincronizado: false,
+    };
+    await db.ejecuciones.put(updated);
+    dispatch({ type: 'UPDATE_EJECUCION', payload: updated });
+    autoSyncIfOnline();
+  }, [state.ejecuciones, autoSyncIfOnline]);
+
   const eliminarEjecucion = useCallback(async (id: string) => {
     await db.ejecuciones.delete(id);
     dispatch({ type: 'DELETE_EJECUCION', payload: id });
@@ -659,6 +680,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       importarPresupuesto,
       editarPartida,
       registrarEjecucion,
+      editarEjecucion,
       eliminarEjecucion,
       registrarGasto,
       eliminarGasto,
