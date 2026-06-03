@@ -228,3 +228,31 @@ syncRouter.post('/', requireAuth, async (req: AuthRequest, res): Promise<any> =>
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
+
+// ── DELETE /api/sync/proyecto/:id — elimina un proyecto y todos sus datos ─────
+syncRouter.delete('/proyecto/:id', requireAuth, async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const userId = req.userId!;
+    const proyectoId = req.params.id;
+
+    const [owned] = await db
+      .select({ id: proyectos.id, userId: proyectos.userId })
+      .from(proyectos)
+      .where(eq(proyectos.id, proyectoId));
+
+    if (!owned || owned.userId !== userId) {
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
+    }
+
+    // Borrar en cascada manual (SQLite sin CASCADE DELETE configurado)
+    await db.delete(gastos).where(eq(gastos.proyectoId, proyectoId));
+    await db.delete(ejecuciones).where(eq(ejecuciones.proyectoId, proyectoId));
+    await db.delete(partidas).where(eq(partidas.proyectoId, proyectoId));
+    await db.delete(proyectos).where(eq(proyectos.id, proyectoId));
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error en DELETE /api/sync/proyecto/:id:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});

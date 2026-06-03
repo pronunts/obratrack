@@ -31,6 +31,7 @@ import {
   loadProyectoData,
   countAllPendientes,
   deleteProyecto as dbDeleteProyecto,
+  deleteProyectoFromCloud,
   importarPartidasBulk,
   fetchAllFromCloud,
   syncAllToCloud,
@@ -421,6 +422,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (getUIPrefs().proyectoActivoId === id) {
       setUIPrefs({ proyectoActivoId: null });
     }
+    // Eliminar del servidor en segundo plano — falla silenciosamente si no hay red
+    deleteProyectoFromCloud(id).catch(() => {});
   }, []);
 
   const actualizarProyecto = useCallback(async (proyecto: Proyecto) => {

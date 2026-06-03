@@ -244,6 +244,15 @@ export async function fetchAllFromCloud(): Promise<void> {
   });
 }
 
+/** Elimina un proyecto del servidor en la nube */
+export async function deleteProyectoFromCloud(proyectoId: string): Promise<void> {
+  const token = localStorage.getItem('obratrack_token');
+  if (!token) return;
+  await axios.delete(`/api/sync/proyecto/${proyectoId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 // ── Descarta TODOS los cambios pendientes (todas los proyectos) ───────────────
 // Usar cuando el usuario quiere volver al estado del servidor.
 
