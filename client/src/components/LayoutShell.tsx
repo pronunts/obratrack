@@ -74,18 +74,24 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Proyecto activo */}
-        {proyectoActivo && (
-          <div className="px-4 py-3 mx-3 mt-3 rounded-xl bg-sidebar-accent/50 border border-sidebar-border">
-            <div className="flex items-center gap-2">
-              <Building2 className="w-3.5 h-3.5 text-sidebar-foreground/60 shrink-0" />
-              <p className="text-xs text-sidebar-foreground/60 font-medium">Proyecto Activo</p>
-            </div>
-            <p className="text-sm font-semibold text-sidebar-foreground mt-0.5 leading-snug">
+        {/* Proyecto activo — siempre visible */}
+        <div className="px-4 py-3 mx-3 mt-3 rounded-xl bg-sidebar-accent/50 border border-sidebar-border">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-3.5 h-3.5 text-sidebar-foreground/60 shrink-0" />
+            <p className="text-xs text-sidebar-foreground/60 font-medium">Proyecto Activo</p>
+          </div>
+          {proyectoActivo ? (
+            <p className="text-sm font-semibold text-sidebar-foreground mt-0.5 leading-snug truncate">
               {proyectoActivo.nombre}
             </p>
-          </div>
-        )}
+          ) : (
+            <Link href="/app">
+              <p className="text-sm font-medium text-amber-500 hover:text-amber-400 mt-0.5 cursor-pointer transition-colors">
+                Sin proyecto — Seleccioná uno
+              </p>
+            </Link>
+          )}
+        </div>
 
         {/* Nav items */}
         <nav className="flex-1 px-3 py-4 space-y-1">
@@ -183,10 +189,16 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
             <img src={LOGO_URL} alt="ObraTrack" className="w-8 h-8 rounded-lg object-contain bg-white p-0.5 border border-border" />
             <div>
               <p className="font-bold text-sm leading-tight">ObraTrack</p>
-              {proyectoActivo && (
+              {proyectoActivo ? (
                 <p className="text-xs text-muted-foreground leading-tight truncate max-w-[160px]">
                   {proyectoActivo.nombre}
                 </p>
+              ) : (
+                <Link href="/app">
+                  <p className="text-xs text-amber-500 leading-tight cursor-pointer">
+                    Sin proyecto activo
+                  </p>
+                </Link>
               )}
             </div>
           </div>

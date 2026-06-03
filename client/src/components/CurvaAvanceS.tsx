@@ -31,8 +31,8 @@ type Props = PropsFromData | PropsFromPrecomputed;
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs shadow-xl">
-      <p className="text-slate-400 font-medium mb-1">{label}</p>
+    <div className="bg-popover border border-border rounded-lg px-3 py-2 text-xs shadow-xl">
+      <p className="text-muted-foreground font-medium mb-1">{label}</p>
       {payload.map((entry: { name: string; value: number; color: string }) => (
         <p key={entry.name} style={{ color: entry.color }} className="font-semibold">
           {entry.name}: {entry.value?.toFixed(1) ?? '—'}%
@@ -64,9 +64,9 @@ export function CurvaAvanceS(props: Props) {
   }, [props]);
 
   return (
-    <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-5 h-full">
+    <div className="bg-card border border-border rounded-2xl p-5 h-full">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">
+        <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
           Curva de Avance S
         </h3>
         {pctRealActual > 0 && (
@@ -88,9 +88,9 @@ export function CurvaAvanceS(props: Props) {
               <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-          <XAxis dataKey="mes" tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} interval={3} />
-          <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
+          <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" vertical={false} />
+          <XAxis dataKey="mes" tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false} interval={3} />
+          <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
           <Tooltip content={<CustomTooltip />} />
           <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '12px' }} formatter={(value) => <span style={{ color: '#94a3b8' }}>{value}</span>} />
           {mesActual && (

@@ -44,7 +44,7 @@ function HitoItem({ hito }: { hito: Hito }) {
   const esProximo = hito.estado === 'proximo';
 
   return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-slate-700/50 last:border-0">
+    <div className="flex items-center gap-3 py-2.5 border-b border-border/50 last:border-0">
       {esLogrado ? (
         <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
       ) : esProximo ? (
@@ -55,7 +55,7 @@ function HitoItem({ hito }: { hito: Hito }) {
         <Clock className="w-4 h-4 shrink-0 text-cyan-400" />
       )}
       <span className={`flex-1 text-sm leading-snug ${
-        esLogrado ? 'text-slate-300 line-through opacity-70' :
+        esLogrado ? 'text-muted-foreground line-through opacity-70' :
         esProximo ? 'text-orange-300' : 'text-cyan-300'
       }`}>
         {hito.label}
@@ -85,7 +85,7 @@ function Lightbox({ imagen, onClose, onDelete }: LightboxProps) {
       onClick={onClose}
     >
       <div
-        className="relative max-w-3xl w-full rounded-2xl overflow-hidden bg-slate-900 shadow-2xl"
+        className="relative max-w-3xl w-full rounded-2xl overflow-hidden bg-card shadow-2xl border border-border"
         onClick={(e) => e.stopPropagation()}
       >
         <img
@@ -96,9 +96,9 @@ function Lightbox({ imagen, onClose, onDelete }: LightboxProps) {
         <div className="px-4 py-3 flex items-start justify-between gap-3">
           <div className="min-w-0">
             {imagen.descripcion && (
-              <p className="text-sm text-slate-200 font-medium truncate">{imagen.descripcion}</p>
+              <p className="text-sm text-foreground font-medium truncate">{imagen.descripcion}</p>
             )}
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {imagen.fecha}
               {imagen.ubicacion && ` · ${imagen.ubicacion}`}
             </p>
@@ -115,7 +115,7 @@ function Lightbox({ imagen, onClose, onDelete }: LightboxProps) {
             )}
             <button
               onClick={onClose}
-              className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
+              className="p-2 rounded-lg bg-muted hover:bg-muted/80 text-foreground transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -135,7 +135,7 @@ function FotoThumb({ imagen, onClick }: FotoThumbProps) {
   return (
     <button
       onClick={onClick}
-      className="group relative shrink-0 w-24 h-24 rounded-xl overflow-hidden border border-slate-700 hover:border-cyan-500/60 transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+      className="group relative shrink-0 w-24 h-24 rounded-xl overflow-hidden border border-border hover:border-cyan-500/60 transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
     >
       <img src={imagen.dataUrl} alt={imagen.nombre} className="w-full h-full object-cover" />
       {/* Overlay con info */}
@@ -206,15 +206,15 @@ export function HitosYFotos({
         />
       )}
 
-      <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-5 space-y-5">
-        <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">
+      <div className="bg-card border border-border rounded-2xl p-5 space-y-5">
+        <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
           Hitos y Fotos de Obra
         </h3>
 
         {/* ── Hitos ── */}
         <div>
           {resumenes.length === 0 ? (
-            <p className="text-xs text-slate-500 italic">Sin datos de avance registrados.</p>
+            <p className="text-xs text-muted-foreground italic">Sin datos de avance registrados.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
               {/* Logrados */}
@@ -242,15 +242,15 @@ export function HitosYFotos({
         {/* ── Galería ── */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
               Fotos Recientes ({imagenes.length})
             </p>
             {!soloLectura && (
               <label
                 className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer transition-colors
                   ${subiendo
-                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
-                    : 'bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 border border-cyan-600/30'
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                    : 'bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-600 dark:text-cyan-400 border border-cyan-600/30'
                   }`}
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -270,12 +270,12 @@ export function HitosYFotos({
 
           {imagenes.length === 0 ? (
             <div
-              className={`rounded-xl border-2 border-dashed border-slate-700 p-6 text-center ${
+              className={`rounded-xl border-2 border-dashed border-border p-6 text-center ${
                 soloLectura ? '' : 'cursor-pointer hover:border-cyan-600/50 transition-colors'
               }`}
               onClick={() => !soloLectura && inputRef.current?.click()}
             >
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 {soloLectura ? 'Sin fotos de obra registradas.' : 'Sin fotos aún. Hacé clic para subir.'}
               </p>
             </div>
