@@ -165,8 +165,9 @@ const plugins = [
     manifest: false, // usamos el manifest.json existente en /public
     workbox: {
       globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-      navigateFallback: 'offline.html',
-      navigateFallbackDenylist: [/^\/api\//],
+      // Para una SPA: siempre servir index.html y dejar que React Router maneje las rutas
+      navigateFallback: '/index.html',
+      navigateFallbackDenylist: [/^\/api\//], // las llamadas API no pasan por el SW
       runtimeCaching: [
         // Estrategia: API calls → Network first, fallback a caché
         {

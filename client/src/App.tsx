@@ -21,6 +21,7 @@ import Ejecucion from './pages/Ejecucion';
 import Costos from './pages/Costos';
 import Dashboard from './pages/Dashboard';
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
+import { OfflineBanner } from './components/OfflineBanner';
 
 function ProtectedRoute({ component: Component }: { component: React.ElementType }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -71,6 +72,7 @@ function App() {
                 <Toaster richColors position="top-center" />
                 <Router />
                 <PWAUpdatePrompt />
+                <OfflineBanner />
               </TooltipProvider>
             </AppProvider>
           </AuthProvider>
