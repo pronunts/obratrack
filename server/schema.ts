@@ -68,10 +68,11 @@ export const gastos = sqliteTable('gastos', {
   creadoEn: text('creado_en').notNull(),
 });
 
-export const shares = sqliteTable('shares', {
-  id: text('id').primaryKey(),          // nanoid — el token público
+// shares_v2: live data — el GET siempre computa desde la DB en vivo
+export const shares = sqliteTable('shares_v2', {
+  id:         text('id').primaryKey(),
   proyectoId: text('proyecto_id').notNull(),
-  userId: integer('user_id').notNull().references(() => users.id),
-  snapshot: text('snapshot').notNull(), // JSON serializado del ShareSnapshot
-  creadoEn: text('creado_en').notNull(),
+  userId:     integer('user_id').notNull().references(() => users.id),
+  active:     integer('active').notNull().default(1),
+  creadoEn:   text('creado_en').notNull(),
 });

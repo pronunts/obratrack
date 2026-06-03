@@ -5,45 +5,20 @@
 
 import { useMemo, useState } from 'react';
 import {
-  MapPin, Calendar, Share2, Check, Building2,
+  MapPin, Calendar, Share2, Building2,
   TrendingUp, TrendingDown, DollarSign, Layers, Clock, AlertTriangle,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { useApp } from '@/contexts/AppContext';
 import { useImagenes } from '@/hooks/useImagenes';
 import { AvanceFisicoFinanciero } from '@/components/AvanceFisicoFinanciero';
 import { CurvaAvanceS } from '@/components/CurvaAvanceS';
 import { HitosYFotos } from '@/components/HitosYFotos';
-import { buildCurvaData } from '@/lib/curvaUtils';
-import type { ShareSnapshot, ShareHito, ResumenPartida } from '@/lib/types';
+import { SharePanel } from '@/components/SharePanel';
 
 // ── Helpers ──────────────────────────────────────────────
 
 function fmtUSD(n: number) {
   return new Intl.NumberFormat('es-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
-}
-
-function derivarHitosSnapshot(resumenes: ResumenPartida[]): ShareHito[] {
-  const map = new Map<string, ResumenPartida[]>();
-  for (const r of resumenes) {
-    const lista = map.get(r.capitulo) ?? [];
-    lista.push(r);
-    map.set(r.capitulo, lista);
-  }
-  const hitos: ShareHito[] = [];
-  for (const capitulo of Array.from(map.keys())) {
-    const partidas = map.get(capitulo)!;
-    const avgPct = partidas.reduce((s, p) => s + Math.min(p.porcentajeAvance, 100), 0) / partidas.length;
-    let estado: ShareHito['estado'];
-    if (avgPct >= 90)     estado = 'logrado';
-    else if (avgPct >= 5) estado = 'en_curso';
-    else                   estado = 'proximo';
-    hitos.push({ label: capitulo, pct: Math.round(avgPct), estado });
-  }
-  return hitos.sort((a, b) => {
-    const orden = { logrado: 0, en_curso: 1, proximo: 2 };
-    return orden[a.estado] - orden[b.estado];
-  });
 }
 
 // ── KPI Card ─────────────────────────────────────────────
@@ -72,20 +47,6 @@ function KpiCard({ label, value, sub, color = 'default', icon: Icon }: {
   );
 }
 
-// ── Share Button ─────────────────────────────────────────
-
-function ShareButton({ onShare, sharing }: { onShare: () => Promise<void>; sharing: boolean }) {
-  return (
-    <button
-      onClick={onShare}
-      disabled={sharing}
-      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-sm font-semibold transition-colors shadow-lg shadow-cyan-900/30"
-    >
-      <Share2 className="w-4 h-4" />
-      {sharing ? 'Generando link...' : 'Compartir con cliente'}
-    </button>
-  );
-}
 
 // ── Componente principal ─────────────────────────────────
 
@@ -93,8 +54,7 @@ export default function DashboardCliente() {
   const { state, proyectoActivo, getResumenPartidas } = useApp();
   const resumenes = getResumenPartidas();
   const { imagenes, subirImagen, eliminarImagen } = useImagenes(state.proyectoActivoId);
-  const [sharing, setSharing] = useState(false);
-  const [sharedUrl, setSharedUrl] = useState<string | null>(null);
+  const [panelAbierto, setPanelAbierto] = useState(false);
 
   const totalPresupuestadoUSD = state.partidas.reduce((s, p) => s + p.precioTotalUSD, 0);
   const totalGastadoUSD       = state.gastos.reduce((s, g) => s + g.montoUSD, 0);
@@ -124,75 +84,6 @@ export default function DashboardCliente() {
 
   const partidasCompletas = resumenes.filter(r => r.porcentajeAvance >= 100).length;
 
-  const handleShare = async () => {
-    if (!proyectoActivo) return;
-    setSharing(true);
-    try {
-      const curvaData = buildCurvaData(
-        state.partidas, state.ejecuciones,
-        proyectoActivo.fechaInicio, proyectoActivo.fechaFin,
-      );
-      const hitos = derivarHitosSnapshot(resumenes);
-
-      const snapshot: ShareSnapshot = {
-        proyecto: {
-          nombre: proyectoActivo.nombre,
-          descripcion: proyectoActivo.descripcion,
-          ubicacion: proyectoActivo.ubicacion,
-          fechaInicio: proyectoActivo.fechaInicio,
-          fechaFin: proyectoActivo.fechaFin,
-          monedaLocal: proyectoActivo.monedaLocal,
-          tasaCambioDefault: proyectoActivo.tasaCambioDefault,
-        },
-        kpis: {
-          avanceFisico,
-          avanceFinanciero,
-          totalPresupuestadoUSD,
-          totalGastadoUSD,
-          desviacionPct,
-          totalPartidas: state.partidas.length,
-          partidasCompletas,
-          diasTranscurridos,
-          diasRestantes,
-        },
-        curvaData,
-        hitos,
-        imagenes: imagenes.map(img => ({
-          id: img.id,
-          nombre: img.nombre,
-          descripcion: img.descripcion,
-          fecha: img.fecha,
-          ubicacion: img.ubicacion,
-          dataUrl: img.dataUrl,
-        })),
-        generadoEn: new Date().toISOString(),
-      };
-
-      const token  = localStorage.getItem('obratrack_token');
-      const resp   = await fetch('/api/shares', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ proyectoId: proyectoActivo.id, snapshot }),
-      });
-
-      if (!resp.ok) throw new Error('Error del servidor');
-
-      const { token: shareToken } = await resp.json();
-      const url = `${window.location.origin}/share/${shareToken}`;
-      setSharedUrl(url);
-
-      await navigator.clipboard.writeText(url);
-      toast.success('Link copiado al portapapeles', { description: url });
-    } catch (err) {
-      console.error(err);
-      toast.error('No se pudo generar el link');
-    } finally {
-      setSharing(false);
-    }
-  };
 
   const fechaFmt = (iso?: string) =>
     iso ? new Date(iso + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
@@ -239,20 +130,13 @@ export default function DashboardCliente() {
             </span>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-2 shrink-0">
-          <ShareButton onShare={handleShare} sharing={sharing} />
-          {sharedUrl && (
-            <a
-              href={sharedUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
-            >
-              <Check className="w-3 h-3" />
-              Ver link generado
-            </a>
-          )}
-        </div>
+        <button
+          onClick={() => setPanelAbierto(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold transition-colors shadow-lg shadow-cyan-900/30 shrink-0"
+        >
+          <Share2 className="w-4 h-4" />
+          Compartir
+        </button>
       </div>
 
       {/* ── KPIs ── */}
@@ -319,6 +203,17 @@ export default function DashboardCliente() {
         onSubirImagen={subirImagen}
         onEliminarImagen={eliminarImagen}
       />
+
+      <p className="text-center text-xs text-slate-700 pb-4">
+        ObraTrack · {new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}
+      </p>
+
+      {panelAbierto && proyectoActivo && (
+        <SharePanel
+          proyectoId={proyectoActivo.id}
+          onClose={() => setPanelAbierto(false)}
+        />
+      )}
     </div>
   );
 }

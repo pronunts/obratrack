@@ -100,15 +100,22 @@ client.execute(`
   );
 `);
 
+// shares v2: live data (sin snapshot estático)
+// Si existe la tabla vieja con snapshot, la reemplazamos.
 client.execute(`
-  CREATE TABLE IF NOT EXISTS shares (
+  CREATE TABLE IF NOT EXISTS shares_v2 (
     id TEXT PRIMARY KEY,
     proyecto_id TEXT NOT NULL,
     user_id INTEGER NOT NULL,
-    snapshot TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
     creado_en TEXT NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
+`);
+// Índice único: un solo share activo por proyecto+usuario
+client.execute(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_shares_v2_project_user
+  ON shares_v2(proyecto_id, user_id);
 `);
 
 export const db = drizzle(client, { schema });
