@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
+import { VitePWA } from "vite-plugin-pwa";
 
 // =============================================================================
 // Manus Debug Collector - Vite Plugin
@@ -150,7 +151,58 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+const plugins = [
+  react(),
+  tailwindcss(),
+  jsxLocPlugin(),
+  vitePluginManusRuntime(),
+  vitePluginManusDebugCollector(),
+  VitePWA({
+    registerType: 'autoUpdate',
+    injectRegister: 'auto',
+    devOptions: { enabled: false },
+    includeAssets: ['offline.html', 'manifest.json'],
+    manifest: false, // usamos el manifest.json existente en /public
+    workbox: {
+      globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+      navigateFallback: 'offline.html',
+      navigateFallbackDenylist: [/^\/api\//],
+      runtimeCaching: [
+        // Estrategia: API calls → Network first, fallback a caché
+        {
+          urlPattern: /^\/api\/.*/i,
+          handler: 'NetworkFirst',
+          options: {
+            cacheName: 'obratrack-api-cache',
+            networkTimeoutSeconds: 8,
+            expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 7 },
+            cacheableResponse: { statuses: [0, 200] },
+          },
+        },
+        // Estrategia: Assets de la app → Cache first (carga instantánea)
+        {
+          urlPattern: /\.(?:js|css|woff2?)$/,
+          handler: 'CacheFirst',
+          options: {
+            cacheName: 'obratrack-assets',
+            expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            cacheableResponse: { statuses: [0, 200] },
+          },
+        },
+        // Estrategia: Imágenes → Cache first
+        {
+          urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/,
+          handler: 'CacheFirst',
+          options: {
+            cacheName: 'obratrack-images',
+            expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            cacheableResponse: { statuses: [0, 200] },
+          },
+        },
+      ],
+    },
+  }),
+];
 
 export default defineConfig({
   plugins,

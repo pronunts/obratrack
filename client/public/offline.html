@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sin Conexión — ObraTrack</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0D1B2A;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .card {
+      background: #132237;
+      border: 1px solid #1e3a5f;
+      border-radius: 1.25rem;
+      padding: 3rem 2.5rem;
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+    }
+    .icon {
+      font-size: 4rem;
+      margin-bottom: 1.5rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      color: #F97316;
+    }
+    p {
+      color: #94a3b8;
+      line-height: 1.6;
+      margin-bottom: 2rem;
+      font-size: 0.95rem;
+    }
+    .btn {
+      display: inline-block;
+      background: #F97316;
+      color: #fff;
+      font-weight: 600;
+      padding: 0.75rem 2rem;
+      border-radius: 0.75rem;
+      border: none;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: #ea6a05; }
+    .note {
+      margin-top: 1.5rem;
+      font-size: 0.8rem;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📡</div>
+    <h1>Sin conexión a internet</h1>
+    <p>
+      No se pudo conectar al servidor. Tus datos guardados localmente
+      siguen disponibles — puedes seguir trabajando y sincronizarás
+      cuando vuelva la conexión.
+    </p>
+    <button class="btn" onclick="window.location.reload()">
+      Reintentar conexión
+    </button>
+    <p class="note">ObraTrack guarda tu trabajo aunque estés sin señal.</p>
+  </div>
+</body>
+</html>

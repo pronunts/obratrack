@@ -20,6 +20,7 @@ import Presupuesto from './pages/Presupuesto';
 import Ejecucion from './pages/Ejecucion';
 import Costos from './pages/Costos';
 import Dashboard from './pages/Dashboard';
+import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
 
 function ProtectedRoute({ component: Component }: { component: React.ElementType }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -69,6 +70,7 @@ function App() {
               <TooltipProvider>
                 <Toaster richColors position="top-center" />
                 <Router />
+                <PWAUpdatePrompt />
               </TooltipProvider>
             </AppProvider>
           </AuthProvider>
