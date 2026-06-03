@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { useState } from 'react';
 import { FeedbackModal } from './FeedbackModal';
 
-const LOGO_URL = 'https://private-us-east-1.manuscdn.com/sessionFile/FTtUQULIBZNay0pvsbzuTe/sandbox/NsPWxdjdEySWGjqv8Pe7N3_1771515161470_na1fn_bG9nby1pY29u.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvRlR0VVFVTElCWk5heTBwdnNienVUZS9zYW5kYm94L05zUFd4ZGpkRXlTV0dqcXY4UGU3TjNfMTc3MTUxNTE2MTQ3MF9uYTFmbl9iRzluYnkxcFkyOXUucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=vtyPaDjA0~tILA0J60DSaUYOf1lix7z8hTT1pBnyshMV-JsMJrwqdhRmcS3HMECqH7bsve2-z6cdo5~yI62R082TVa9b2b571kGjEmakGYtB-wwZa1LkcVhNHpN7N6xNLji1d86Qllc8YsTjnZOqfXjhSCcP-zfWHgEhMitlEXVAda-sfjtGFfQ2~RuiI7HnjLuKWhmQktF04L~0wad7zQFlKKdZfsUHw8JeonRtgbllyJxuw9t~lKhksT-x5rKZHL~xpn7yXcpTBMKZVGpY-Fl~YO3juboMhUU-agiwg-y77TEua9NI~mRGsA55MS-tiaYdYc4GvKXPmMvjOmurgQ__';
+const LOGO_URL = '/logo.png';
 
 interface NavItem {
   href: string;
