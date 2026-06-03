@@ -84,12 +84,19 @@ export function buildCurvaData(
     ? new Date(fechaFin + 'T12:00:00')
     : new Date(inicio.getTime() + 365 * 24 * 60 * 60 * 1000);
 
+  const duracionMs = fin.getTime() - inicio.getTime();
   const curvaPlan  = generarCurvaPlanificada(inicio, fin);
   const avanceReal = calcularAvanceReal(partidas, ejecuciones, inicio, fin);
+  const hoy        = new Date();
 
-  return curvaPlan.map(({ mes, planificado }) => ({
-    mes,
-    planificado,
-    real: avanceReal.has(mes) ? avanceReal.get(mes) : undefined,
-  }));
+  return curvaPlan.map(({ mes, planificado }, i) => {
+    // La fecha exacta de este punto en el timeline
+    const fechaPunto = new Date(inicio.getTime() + duracionMs * (i / PUNTOS));
+    // Solo mostrar real para puntos que ya ocurrieron (no meses futuros)
+    const real = fechaPunto <= hoy && avanceReal.has(mes)
+      ? avanceReal.get(mes)
+      : undefined;
+
+    return { mes, planificado, real };
+  });
 }
