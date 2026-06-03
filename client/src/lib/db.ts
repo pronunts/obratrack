@@ -12,6 +12,7 @@
 // ============================================================
 
 import Dexie, { type Table } from 'dexie';
+import axios from 'axios';
 import type {
   Proyecto,
   PartidaPresupuesto,
@@ -148,75 +149,141 @@ export async function importarPartidasBulk(
   });
 }
 
-// ── Servicio de Sincronización Cloud ─────────────────────
-// Preparado para conectar con Supabase o Firebase en la siguiente fase.
-// Los métodos están implementados como stubs que retornan un resultado exitoso
-// simulado. En la siguiente fase, reemplazar el cuerpo con las llamadas reales.
+// ── Sync: sube TODOS los pendientes al servidor ───────────────────────────────
+// Estrategia: last-write-wins con `actualizadoEn` para proyectos,
+// append-only para ejecuciones/gastos (IDs únicos, sin conflicto real).
+
+export async function syncAllToCloud(): Promise<{ uploaded: number }> {
+  const token = localStorage.getItem('obratrack_token');
+  if (!token) return { uploaded: 0 };
+
+  const [pendingProyectos, pendingPartidas, pendingEjecuciones, pendingGastos] = await Promise.all([
+    db.proyectos.filter(p => !p.sincronizado).toArray(),
+    db.partidas.filter(p => !p.sincronizado).toArray(),
+    db.ejecuciones.filter(e => !e.sincronizado).toArray(),
+    db.gastos.filter(g => !g.sincronizado).toArray(),
+  ]);
+
+  const total = pendingProyectos.length + pendingPartidas.length + pendingEjecuciones.length + pendingGastos.length;
+  if (total === 0) return { uploaded: 0 };
+
+  await axios.post('/api/sync', {
+    proyectos: pendingProyectos,
+    partidas: pendingPartidas,
+    ejecuciones: pendingEjecuciones,
+    gastos: pendingGastos,
+  }, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  // Marcar todo como sincronizado en IndexedDB
+  await db.transaction('rw', db.proyectos, db.partidas, db.ejecuciones, db.gastos, async () => {
+    await db.proyectos.filter(p => !p.sincronizado).modify({ sincronizado: true });
+    await db.partidas.filter(p => !p.sincronizado).modify({ sincronizado: true });
+    await db.ejecuciones.filter(e => !e.sincronizado).modify({ sincronizado: true });
+    await db.gastos.filter(g => !g.sincronizado).modify({ sincronizado: true });
+  });
+
+  return { uploaded: pendingEjecuciones.length + pendingGastos.length };
+}
+
+// ── Fetch del servidor con merge inteligente ──────────────────────────────────
+// Reglas de merge:
+//   Proyectos:  server gana si `actualizadoEn` server ≥ local, o si local ya está sincronizado.
+//   Partidas:   server siempre gana (son read-only post-importación).
+//   Ejecuciones/Gastos: append-only — el server agrega los suyos, NO sobreescribe
+//               items locales con `sincronizado: false` (cambios offline del usuario).
+
+export async function fetchAllFromCloud(): Promise<void> {
+  const token = localStorage.getItem('obratrack_token');
+  if (!token) return;
+
+  const response = await axios.get('/api/sync', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const {
+    proyectos: sProyectos = [],
+    partidas: sPartidas = [],
+    ejecuciones: sEjecuciones = [],
+    gastos: sGastos = [],
+  } = response.data;
+
+  // Obtener IDs de items pendientes locales para protegerlos del sobreescritura
+  const [pendingEj, pendingGa] = await Promise.all([
+    db.ejecuciones.filter(e => !e.sincronizado).toArray(),
+    db.gastos.filter(g => !g.sincronizado).toArray(),
+  ]);
+  const pendingEjIds = new Set(pendingEj.map(e => e.id));
+  const pendingGaIds = new Set(pendingGa.map(g => g.id));
+
+  await db.transaction('rw', db.proyectos, db.partidas, db.ejecuciones, db.gastos, async () => {
+    // Proyectos: merge por timestamp
+    for (const sp of sProyectos) {
+      const local = await db.proyectos.get(sp.id);
+      const serverIsNewer = !local || new Date(sp.actualizadoEn) >= new Date(local.actualizadoEn);
+      const localHasOfflineChanges = local && !local.sincronizado;
+
+      if (!localHasOfflineChanges || serverIsNewer) {
+        await db.proyectos.put({ ...sp, sincronizado: true });
+      }
+    }
+
+    // Partidas: server siempre gana (importación masiva, read-only)
+    if (sPartidas.length) {
+      await db.partidas.bulkPut(sPartidas);
+    }
+
+    // Ejecuciones: agregar solo las que no existen localmente como pendientes
+    const ejToAdd = sEjecuciones.filter((e: any) => !pendingEjIds.has(e.id));
+    if (ejToAdd.length) await db.ejecuciones.bulkPut(ejToAdd);
+
+    // Gastos: ídem
+    const gaToAdd = sGastos.filter((g: any) => !pendingGaIds.has(g.id));
+    if (gaToAdd.length) await db.gastos.bulkPut(gaToAdd);
+  });
+}
+
+// ── Descarta TODOS los cambios pendientes (todas los proyectos) ───────────────
+// Usar cuando el usuario quiere volver al estado del servidor.
+
+export async function descartarTodosLosPendientes(): Promise<number> {
+  const [pendingEj, pendingGa] = await Promise.all([
+    db.ejecuciones.filter(e => !e.sincronizado).toArray(),
+    db.gastos.filter(g => !g.sincronizado).toArray(),
+  ]);
+
+  const count = pendingEj.length + pendingGa.length;
+  if (count === 0) return 0;
+
+  await db.transaction('rw', db.ejecuciones, db.gastos, async () => {
+    await Promise.all([
+      ...pendingEj.map(e => db.ejecuciones.delete(e.id)),
+      ...pendingGa.map(g => db.gastos.delete(g.id)),
+    ]);
+  });
+
+  return count;
+}
+
+// ── Servicio legacy (mantenido por compatibilidad interna) ────────────────────
 
 export const cloudSyncService: CloudSyncService = {
-  /**
-   * Sube los registros pendientes al backend remoto.
-   *
-   * SIGUIENTE FASE — Implementación con Supabase:
-   * ```ts
-   * const { data, error } = await supabase
-   *   .from('ejecuciones')
-   *   .upsert(pendingEjecuciones, { onConflict: 'id' });
-   * ```
-   *
-   * SIGUIENTE FASE — Implementación con Firebase:
-   * ```ts
-   * const batch = writeBatch(db);
-   * pendingEjecuciones.forEach(e => {
-   *   batch.set(doc(firestore, 'ejecuciones', e.id), e);
-   * });
-   * await batch.commit();
-   * ```
-   */
-  async syncToCloud(proyectoId: string): Promise<SyncResult> {
-    console.info(`[ObraTrack] syncToCloud() → proyectoId: ${proyectoId}`);
-    console.info('[ObraTrack] TODO: Conectar con Supabase/Firebase en la siguiente fase');
-
-    // Simular latencia de red
-    await new Promise(r => setTimeout(r, 800));
-
-    // Marcar como sincronizados localmente
-    await markAllSynced(proyectoId);
-
-    return {
-      success: true,
-      sincronizados: await db.ejecuciones.where('proyectoId').equals(proyectoId).count() +
-                     await db.gastos.where('proyectoId').equals(proyectoId).count(),
-      errores: [],
-      timestamp: new Date().toISOString(),
-    };
+  async syncToCloud(_proyectoId: string): Promise<SyncResult> {
+    try {
+      const { uploaded } = await syncAllToCloud();
+      return { success: true, sincronizados: uploaded, errores: [], timestamp: new Date().toISOString() };
+    } catch (e: any) {
+      return { success: false, sincronizados: 0, errores: [e?.message ?? 'Error'], timestamp: new Date().toISOString() };
+    }
   },
 
-  /**
-   * Descarga los datos del backend y los fusiona con los locales.
-   *
-   * SIGUIENTE FASE — Implementación con Supabase:
-   * ```ts
-   * const { data } = await supabase
-   *   .from('ejecuciones')
-   *   .select('*')
-   *   .eq('proyecto_id', proyectoId)
-   *   .gt('updated_at', lastSyncTimestamp);
-   * await db.ejecuciones.bulkPut(data);
-   * ```
-   */
-  async fetchFromCloud(proyectoId: string): Promise<SyncResult> {
-    console.info(`[ObraTrack] fetchFromCloud() → proyectoId: ${proyectoId}`);
-    console.info('[ObraTrack] TODO: Conectar con Supabase/Firebase en la siguiente fase');
-
-    // Simular latencia de red
-    await new Promise(r => setTimeout(r, 600));
-
-    return {
-      success: true,
-      sincronizados: 0,
-      errores: [],
-      timestamp: new Date().toISOString(),
-    };
+  async fetchFromCloud(_proyectoId: string): Promise<SyncResult> {
+    try {
+      await fetchAllFromCloud();
+      return { success: true, sincronizados: 0, errores: [], timestamp: new Date().toISOString() };
+    } catch (e: any) {
+      return { success: false, sincronizados: 0, errores: [e?.message ?? 'Error'], timestamp: new Date().toISOString() };
+    }
   },
 };

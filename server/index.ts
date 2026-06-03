@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 
 import { authRouter } from './routes/auth.js';
 import { feedbackRouter } from './routes/feedback.js';
+import { syncRouter } from './routes/sync.js';
 
 async function startServer() {
   const app = express();
@@ -20,6 +21,9 @@ async function startServer() {
 
   // Mount feedback route
   app.use('/api/feedback', feedbackRouter);
+
+  // Mount sync route (data persistence cross-device)
+  app.use('/api/sync', syncRouter);
 
   // Serve static files from dist/public in production
   const staticPath =

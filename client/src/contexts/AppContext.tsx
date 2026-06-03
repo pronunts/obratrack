@@ -10,7 +10,7 @@ import React, {
   useReducer,
   useEffect,
   useCallback,
-  useState,
+  useRef,
 } from 'react';
 import { nanoid } from 'nanoid';
 import type {
@@ -31,10 +31,12 @@ import {
   loadProyectoData,
   countAllPendientes,
   deleteProyecto as dbDeleteProyecto,
-  markAllSynced,
   importarPartidasBulk,
-  cloudSyncService,
+  fetchAllFromCloud,
+  syncAllToCloud,
+  descartarTodosLosPendientes,
 } from '@/lib/db';
+import { useAuth } from './AuthContext';
 
 // ── Estado Inicial ────────────────────────────────────────
 
@@ -45,6 +47,7 @@ const initialState: AppState = {
   ejecuciones: [],
   gastos: [],
   pendientesSincronizacion: 0,
+  ultimaSincronizacion: localStorage.getItem('obratrack_ultima_sync') ?? undefined,
   isOnline: navigator.onLine,
   isLoading: true,
 };
@@ -52,6 +55,8 @@ const initialState: AppState = {
 // ── Acciones ──────────────────────────────────────────────
 
 type Action =
+  | { type: 'SET_LOADING' }
+  | { type: 'SET_ULTIMA_SINCRONIZACION'; payload: string }
   | { type: 'INIT_DONE'; payload: Omit<AppState, 'isOnline'> }
   | { type: 'SET_PROYECTOS'; payload: Proyecto[] }
   | { type: 'ADD_PROYECTO'; payload: Proyecto }
@@ -76,6 +81,12 @@ function calcPendientes(ejecuciones: RegistroEjecucion[], gastos: GastoDiario[])
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
+    case 'SET_LOADING':
+      return { ...state, isLoading: true };
+
+    case 'SET_ULTIMA_SINCRONIZACION':
+      return { ...state, ultimaSincronizacion: action.payload };
+
     case 'INIT_DONE':
       return { ...state, ...action.payload, isLoading: false };
 
@@ -204,6 +215,7 @@ interface AppContextValue {
   eliminarGasto: (id: string) => Promise<void>;
   // Sincronización
   sincronizar: () => Promise<void>;
+  descartarCambiosLocales: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -212,11 +224,24 @@ const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const { user } = useAuth();
+  const prevUserIdRef = useRef<number | null | undefined>(undefined);
 
-  // ── Inicialización desde IndexedDB ────────────────────
+  // ── Inicialización: cloud fetch + IndexedDB ───────────
   useEffect(() => {
     async function init() {
+      dispatch({ type: 'SET_LOADING' });
       try {
+        // Si hay token, traer datos del servidor primero (sync cross-device)
+        const token = localStorage.getItem('obratrack_token');
+        if (token) {
+          try {
+            await fetchAllFromCloud();
+          } catch (e) {
+            console.warn('[ObraTrack] Cloud fetch falló, usando datos locales:', e);
+          }
+        }
+
         const proyectos = await loadProyectos();
         const prefs = getUIPrefs();
         const pendientes = await countAllPendientes();
@@ -226,7 +251,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         let ejecuciones: RegistroEjecucion[] = [];
         let gastos: GastoDiario[] = [];
 
-        // Si hay un proyecto activo guardado, cargar sus datos
         if (proyectoActivoId && proyectos.some(p => p.id === proyectoActivoId)) {
           const data = await loadProyectoData(proyectoActivoId);
           partidas = data.partidas;
@@ -249,15 +273,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           },
         });
       } catch (err) {
-        console.error('[ObraTrack] Error inicializando IndexedDB:', err);
+        console.error('[ObraTrack] Error inicializando:', err);
         dispatch({
           type: 'INIT_DONE',
           payload: { ...initialState, isLoading: false },
         });
       }
     }
-    init();
-  }, []);
+
+    const currentUserId = user?.id ?? null;
+    const prevUserId = prevUserIdRef.current;
+
+    // Inicializa en mount (undefined → any) o cuando el usuario hace login (null → number)
+    if (prevUserId === undefined || (currentUserId !== null && prevUserId === null)) {
+      prevUserIdRef.current = currentUserId;
+      init();
+    } else {
+      prevUserIdRef.current = currentUserId;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // ── Conectividad ──────────────────────────────────────
   useEffect(() => {
@@ -492,11 +527,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ── Sincronización ────────────────────────────────────
 
-  const sincronizar = useCallback(async () => {
-    if (!state.proyectoActivoId) return;
-    await cloudSyncService.syncToCloud(state.proyectoActivoId);
-    dispatch({ type: 'MARK_ALL_SYNCED' });
+  // Helper para registrar timestamp y recargar estado tras un sync exitoso
+  const postSyncReload = useCallback(async () => {
+    const proyectos = await loadProyectos();
+    dispatch({ type: 'SET_PROYECTOS', payload: proyectos });
+
+    if (state.proyectoActivoId && proyectos.some(p => p.id === state.proyectoActivoId)) {
+      const data = await loadProyectoData(state.proyectoActivoId);
+      dispatch({ type: 'SET_PROYECTO_ACTIVO', payload: { id: state.proyectoActivoId, ...data } });
+    }
+
+    const pendientes = await countAllPendientes();
+    dispatch({ type: 'SET_PENDIENTES', payload: pendientes });
+
+    const now = new Date().toISOString();
+    localStorage.setItem('obratrack_ultima_sync', now);
+    dispatch({ type: 'SET_ULTIMA_SINCRONIZACION', payload: now });
   }, [state.proyectoActivoId]);
+
+  // Ciclo completo: sube pendientes → baja cambios del server → reload
+  const sincronizar = useCallback(async () => {
+    await syncAllToCloud();
+    await fetchAllFromCloud();
+    await postSyncReload();
+  }, [postSyncReload]);
+
+  // Descarta todos los cambios offline y vuelve al estado del servidor
+  const descartarCambiosLocales = useCallback(async () => {
+    await descartarTodosLosPendientes();
+    await fetchAllFromCloud();
+    await postSyncReload();
+  }, [postSyncReload]);
 
   return (
     <AppContext.Provider value={{
@@ -516,6 +577,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       registrarGasto,
       eliminarGasto,
       sincronizar,
+      descartarCambiosLocales,
     }}>
       {children}
     </AppContext.Provider>

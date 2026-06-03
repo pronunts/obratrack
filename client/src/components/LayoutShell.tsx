@@ -7,10 +7,11 @@ import { useLocation } from 'wouter';
 import { Link } from 'wouter';
 import {
   LayoutDashboard, FileSpreadsheet, HardHat, DollarSign,
-  Moon, Sun, Wifi, WifiOff, RefreshCw, Building2
+  Moon, Sun, Wifi, WifiOff, RefreshCw, Building2, LogOut
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useApp } from '@/contexts/AppContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { useState } from 'react';
 import { FeedbackModal } from './FeedbackModal';
@@ -35,6 +36,7 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { theme, toggleTheme } = useTheme() as { theme: string; toggleTheme: () => void; switchable: boolean };
   const { state, proyectoActivo, sincronizar } = useApp();
+  const { user, logout } = useAuth();
   const [syncing, setSyncing] = useState(false);
 
   const handleSync = async () => {
@@ -138,8 +140,25 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             {theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}
           </button>
-          
+
           <FeedbackModal />
+
+          {/* Usuario + Cerrar sesión */}
+          <div className="border-t border-sidebar-border pt-2 mt-1">
+            {user && (
+              <div className="px-3 py-1.5 mb-1">
+                <p className="text-xs text-sidebar-foreground/50 font-medium truncate">{user.email}</p>
+                <p className="text-xs font-semibold text-sidebar-foreground truncate">{user.nombre}</p>
+              </div>
+            )}
+            <button
+              onClick={logout}
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 hover:text-red-700 text-sm font-medium transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       </aside>
       {/* ── Contenido Principal ──────────────────────────── */}
@@ -166,6 +185,14 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
               className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-muted transition-colors"
             >
               {theme === 'dark' ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
+            </button>
+            {/* Cerrar sesión (móvil) */}
+            <button
+              onClick={logout}
+              className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-950/30 text-red-500 transition-colors"
+              title="Cerrar sesión"
+            >
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </header>

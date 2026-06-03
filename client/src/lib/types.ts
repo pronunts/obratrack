@@ -77,6 +77,7 @@ export interface AppState {
   gastos: GastoDiario[];
   // Estado de sincronización
   pendientesSincronizacion: number;
+  ultimaSincronizacion?: string; // ISO timestamp de la última sync exitosa
   isOnline: boolean;
   // Estado de carga inicial
   isLoading: boolean;

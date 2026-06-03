@@ -36,4 +36,68 @@ client.execute(`
   );
 `);
 
+client.execute(`
+  CREATE TABLE IF NOT EXISTS proyectos (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    nombre TEXT NOT NULL,
+    descripcion TEXT,
+    ubicacion TEXT,
+    fecha_inicio TEXT NOT NULL,
+    fecha_fin TEXT,
+    moneda_local TEXT NOT NULL DEFAULT 'USD',
+    tasa_cambio_default REAL NOT NULL DEFAULT 1,
+    archivo_origen TEXT,
+    creado_en TEXT NOT NULL,
+    actualizado_en TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+`);
+
+client.execute(`
+  CREATE TABLE IF NOT EXISTS partidas (
+    id TEXT PRIMARY KEY,
+    proyecto_id TEXT NOT NULL,
+    capitulo TEXT NOT NULL,
+    codigo TEXT NOT NULL,
+    descripcion TEXT NOT NULL,
+    unidad TEXT NOT NULL,
+    cantidad_planeada REAL NOT NULL,
+    precio_unitario_usd REAL NOT NULL,
+    precio_total_usd REAL NOT NULL,
+    creado_en TEXT NOT NULL,
+    FOREIGN KEY(proyecto_id) REFERENCES proyectos(id) ON DELETE CASCADE
+  );
+`);
+
+client.execute(`
+  CREATE TABLE IF NOT EXISTS ejecuciones (
+    id TEXT PRIMARY KEY,
+    proyecto_id TEXT NOT NULL,
+    partida_id TEXT NOT NULL,
+    fecha TEXT NOT NULL,
+    cantidad_ejecutada REAL NOT NULL,
+    observaciones TEXT,
+    creado_en TEXT NOT NULL,
+    FOREIGN KEY(proyecto_id) REFERENCES proyectos(id) ON DELETE CASCADE
+  );
+`);
+
+client.execute(`
+  CREATE TABLE IF NOT EXISTS gastos (
+    id TEXT PRIMARY KEY,
+    proyecto_id TEXT NOT NULL,
+    partida_id TEXT NOT NULL,
+    fecha TEXT NOT NULL,
+    descripcion TEXT NOT NULL,
+    monto REAL NOT NULL,
+    moneda TEXT NOT NULL,
+    tasa_cambio REAL NOT NULL,
+    monto_usd REAL NOT NULL,
+    categoria TEXT NOT NULL,
+    creado_en TEXT NOT NULL,
+    FOREIGN KEY(proyecto_id) REFERENCES proyectos(id) ON DELETE CASCADE
+  );
+`);
+
 export const db = drizzle(client, { schema });
