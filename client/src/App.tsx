@@ -21,6 +21,7 @@ import Ejecucion from './pages/Ejecucion';
 import Costos from './pages/Costos';
 import Dashboard from './pages/Dashboard';
 import DashboardCliente from './pages/DashboardCliente';
+import ShareCliente from './pages/ShareCliente';
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
 import { OfflineBanner } from './components/OfflineBanner';
 
@@ -45,6 +46,8 @@ function Router() {
     <Switch>
       <Route path="/" component={Landing} />
       <Route path="/login" component={Login} />
+      {/* Ruta pública — sin auth, sin LayoutShell */}
+      <Route path="/share/:token" component={ShareCliente} />
       <Route>
         <LayoutShell>
           <Switch>

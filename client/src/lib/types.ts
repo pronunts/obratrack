@@ -120,6 +120,56 @@ export interface ImagenObra {
   creadoEn: string;     // ISO timestamp
 }
 
+// ── Share Snapshot (Dashboard Ejecutivo del Cliente) ─────
+
+export interface ShareHito {
+  label: string;
+  estado: 'logrado' | 'en_curso' | 'proximo';
+  pct: number;
+}
+
+export interface ShareImagen {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  fecha: string;
+  ubicacion?: string;
+  dataUrl: string;
+}
+
+export interface ShareCurvaPoint {
+  mes: string;
+  planificado: number;
+  real?: number;
+}
+
+export interface ShareSnapshot {
+  proyecto: {
+    nombre: string;
+    descripcion?: string;
+    ubicacion?: string;
+    fechaInicio: string;
+    fechaFin?: string;
+    monedaLocal: string;
+    tasaCambioDefault: number;
+  };
+  kpis: {
+    avanceFisico: number;
+    avanceFinanciero: number;
+    totalPresupuestadoUSD: number;
+    totalGastadoUSD: number;
+    desviacionPct: number;
+    totalPartidas: number;
+    partidasCompletas: number;
+    diasTranscurridos: number;
+    diasRestantes: number | null;
+  };
+  curvaData: ShareCurvaPoint[];
+  hitos: ShareHito[];
+  imagenes: ShareImagen[];
+  generadoEn: string;
+}
+
 // ── Resultado del Parser ──────────────────────────────────
 
 export interface ParseResult {

@@ -5,15 +5,11 @@
 
 import { useState, useRef } from 'react';
 import { CheckCircle2, Clock, Plus, X, ZoomIn, Trash2 } from 'lucide-react';
-import type { ResumenPartida, ImagenObra } from '@/lib/types';
+import type { ResumenPartida, ImagenObra, ShareHito } from '@/lib/types';
 
 // ── Hitos ────────────────────────────────────────────────
 
-interface Hito {
-  label: string;
-  estado: 'logrado' | 'proximo' | 'en_curso';
-  pct: number;
-}
+type Hito = ShareHito;
 
 function derivarHitos(resumenes: ResumenPartida[]): Hito[] {
   // Agrupar por capítulo
@@ -163,6 +159,7 @@ function FotoThumb({ imagen, onClick }: FotoThumbProps) {
 
 interface Props {
   resumenes: ResumenPartida[];
+  hitosPrecomputados?: Hito[];   // para la vista pública (snapshot pre-calculado)
   imagenes: ImagenObra[];
   onSubirImagen: (file: File, opts?: { descripcion?: string; ubicacion?: string }) => Promise<void>;
   onEliminarImagen: (id: string) => void;
@@ -171,6 +168,7 @@ interface Props {
 
 export function HitosYFotos({
   resumenes,
+  hitosPrecomputados,
   imagenes,
   onSubirImagen,
   onEliminarImagen,
@@ -180,7 +178,7 @@ export function HitosYFotos({
   const [subiendo, setSubiendo] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const hitos = derivarHitos(resumenes);
+  const hitos = hitosPrecomputados ?? derivarHitos(resumenes);
   const logrados = hitos.filter(h => h.estado === 'logrado');
   const proximos  = hitos.filter(h => h.estado !== 'logrado');
 

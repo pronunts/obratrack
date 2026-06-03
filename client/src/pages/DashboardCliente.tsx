@@ -1,54 +1,106 @@
 // ============================================================
-// ObraTrack — Dashboard Ejecutivo del Cliente
-// Vista pública/compartida: avance, curva S, hitos, fotos
+// ObraTrack — Dashboard Ejecutivo del Cliente (Admin View)
+// Layout horizontal — genera el share link para el cliente
 // ============================================================
 
 import { useMemo, useState } from 'react';
-import { MapPin, Calendar, Share2, Check, Building2 } from 'lucide-react';
+import {
+  MapPin, Calendar, Share2, Check, Building2,
+  TrendingUp, TrendingDown, DollarSign, Layers, Clock, AlertTriangle,
+} from 'lucide-react';
+import { toast } from 'sonner';
 import { useApp } from '@/contexts/AppContext';
 import { useImagenes } from '@/hooks/useImagenes';
 import { AvanceFisicoFinanciero } from '@/components/AvanceFisicoFinanciero';
 import { CurvaAvanceS } from '@/components/CurvaAvanceS';
 import { HitosYFotos } from '@/components/HitosYFotos';
+import { buildCurvaData } from '@/lib/curvaUtils';
+import type { ShareSnapshot, ShareHito, ResumenPartida } from '@/lib/types';
 
-const HERO_IMG = 'https://private-us-east-1.manuscdn.com/sessionFile/FTtUQULIBZNay0pvsbzuTe/sandbox/NsPWxdjdEySWGjqv8Pe7N3-img-1_1771515159000_na1fn_aGVyby1kYXNoYm9hcmQ.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvRlR0VVFVTElCWk5heTBwdnNienVUZS9zYW5kYm94L05zUFd4ZGpkRXlTV0dqcXY4UGU3TjMtaW1nLTFfMTc3MTUxNTE1OTAwMF9uYTFmbl9hR1Z5Ynkxa1lYTm9ZbTloY21RLnBuZz94LW9zcy1wcm9jZXNzPWltYWdlL3Jlc2l6ZSx3XzE5MjAsaF8xOTIwL2Zvcm1hdCx3ZWJwL3F1YWxpdHkscV84MCIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc5ODc2MTYwMH19fV19&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=UNxmMusBBoZW85uV1ETbrwX4aOLDFWNiobKPV9SO62lcFqZKK3vixV50S6GHaDsa703x9wBXCrzkYdy~w5VcEuunGjaAGk65WyiaxLuPR0G1H3J0o~jA0NVCqfjO3oBwaWt09lzlJaCIgQvlVkdm5l1XpUeHfn0uVFMgRoR6rq7Cpae6fn9cwzT4KHRkntjmW8gy6Lf8rVxP0xC8c5cxPx5yssQDsb3-R0wGkvtY9QhSb7alfqoScjgtxZuwsjeWuCFESn3fmnfkh7xq-KqGYWkZVTSIrSpD702rklvaYRSVwtv88muiTqE~uxUQuTAMjZGRoG0kioM8lZYDM68GdQ__';
+// ── Helpers ──────────────────────────────────────────────
 
-function ShareButton() {
-  const [copied, setCopied] = useState(false);
+function fmtUSD(n: number) {
+  return new Intl.NumberFormat('es-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+}
 
-  const handleShare = async () => {
-    const url = window.location.href;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: 'Avance de obra', url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      }
-    } catch {
-      // usuario canceló el share o no disponible
-    }
+function derivarHitosSnapshot(resumenes: ResumenPartida[]): ShareHito[] {
+  const map = new Map<string, ResumenPartida[]>();
+  for (const r of resumenes) {
+    const lista = map.get(r.capitulo) ?? [];
+    lista.push(r);
+    map.set(r.capitulo, lista);
+  }
+  const hitos: ShareHito[] = [];
+  for (const capitulo of Array.from(map.keys())) {
+    const partidas = map.get(capitulo)!;
+    const avgPct = partidas.reduce((s, p) => s + Math.min(p.porcentajeAvance, 100), 0) / partidas.length;
+    let estado: ShareHito['estado'];
+    if (avgPct >= 90)     estado = 'logrado';
+    else if (avgPct >= 5) estado = 'en_curso';
+    else                   estado = 'proximo';
+    hitos.push({ label: capitulo, pct: Math.round(avgPct), estado });
+  }
+  return hitos.sort((a, b) => {
+    const orden = { logrado: 0, en_curso: 1, proximo: 2 };
+    return orden[a.estado] - orden[b.estado];
+  });
+}
+
+// ── KPI Card ─────────────────────────────────────────────
+
+function KpiCard({ label, value, sub, color = 'default', icon: Icon }: {
+  label: string; value: string; sub?: string;
+  color?: 'default' | 'green' | 'red' | 'amber' | 'cyan';
+  icon?: React.ComponentType<{ className?: string }>;
+}) {
+  const colorMap = {
+    default: 'text-slate-200',
+    green:   'text-emerald-400',
+    red:     'text-red-400',
+    amber:   'text-amber-400',
+    cyan:    'text-cyan-400',
   };
+  return (
+    <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-4">
+      <div className="flex items-center gap-2 mb-1">
+        {Icon && <Icon className="w-3.5 h-3.5 text-slate-500" />}
+        <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">{label}</p>
+      </div>
+      <p className={`text-lg font-extrabold tabular-nums ${colorMap[color]}`}>{value}</p>
+      {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
+    </div>
+  );
+}
 
+// ── Share Button ─────────────────────────────────────────
+
+function ShareButton({ onShare, sharing }: { onShare: () => Promise<void>; sharing: boolean }) {
   return (
     <button
-      onClick={handleShare}
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700/80 hover:bg-slate-600/80 border border-slate-600 text-slate-300 text-xs font-medium transition-colors"
+      onClick={onShare}
+      disabled={sharing}
+      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-sm font-semibold transition-colors shadow-lg shadow-cyan-900/30"
     >
-      {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
-      {copied ? 'Copiado' : 'Compartir'}
+      <Share2 className="w-4 h-4" />
+      {sharing ? 'Generando link...' : 'Compartir con cliente'}
     </button>
   );
 }
+
+// ── Componente principal ─────────────────────────────────
 
 export default function DashboardCliente() {
   const { state, proyectoActivo, getResumenPartidas } = useApp();
   const resumenes = getResumenPartidas();
   const { imagenes, subirImagen, eliminarImagen } = useImagenes(state.proyectoActivoId);
+  const [sharing, setSharing] = useState(false);
+  const [sharedUrl, setSharedUrl] = useState<string | null>(null);
 
   const totalPresupuestadoUSD = state.partidas.reduce((s, p) => s + p.precioTotalUSD, 0);
   const totalGastadoUSD       = state.gastos.reduce((s, g) => s + g.montoUSD, 0);
+  const desviacionPct = totalPresupuestadoUSD > 0
+    ? ((totalGastadoUSD - totalPresupuestadoUSD) / totalPresupuestadoUSD) * 100
+    : 0;
 
   const avanceFisico = useMemo(() => {
     if (resumenes.length === 0) return 0;
@@ -59,21 +111,102 @@ export default function DashboardCliente() {
     ? Math.min((totalGastadoUSD / totalPresupuestadoUSD) * 100, 100)
     : 0;
 
-  const fechaFormateada = (iso?: string) =>
-    iso ? new Date(iso + 'T12:00:00').toLocaleDateString('es-ES', {
-      day: '2-digit', month: 'long', year: 'numeric',
-    }) : null;
+  const { diasTranscurridos, diasRestantes } = useMemo(() => {
+    if (!proyectoActivo) return { diasTranscurridos: 0, diasRestantes: null };
+    const inicio = new Date(proyectoActivo.fechaInicio + 'T12:00:00');
+    const hoy    = new Date();
+    const trans  = Math.max(0, Math.floor((hoy.getTime() - inicio.getTime()) / 86400000));
+    const rest   = proyectoActivo.fechaFin
+      ? Math.max(0, Math.floor((new Date(proyectoActivo.fechaFin + 'T12:00:00').getTime() - hoy.getTime()) / 86400000))
+      : null;
+    return { diasTranscurridos: trans, diasRestantes: rest };
+  }, [proyectoActivo]);
+
+  const partidasCompletas = resumenes.filter(r => r.porcentajeAvance >= 100).length;
+
+  const handleShare = async () => {
+    if (!proyectoActivo) return;
+    setSharing(true);
+    try {
+      const curvaData = buildCurvaData(
+        state.partidas, state.ejecuciones,
+        proyectoActivo.fechaInicio, proyectoActivo.fechaFin,
+      );
+      const hitos = derivarHitosSnapshot(resumenes);
+
+      const snapshot: ShareSnapshot = {
+        proyecto: {
+          nombre: proyectoActivo.nombre,
+          descripcion: proyectoActivo.descripcion,
+          ubicacion: proyectoActivo.ubicacion,
+          fechaInicio: proyectoActivo.fechaInicio,
+          fechaFin: proyectoActivo.fechaFin,
+          monedaLocal: proyectoActivo.monedaLocal,
+          tasaCambioDefault: proyectoActivo.tasaCambioDefault,
+        },
+        kpis: {
+          avanceFisico,
+          avanceFinanciero,
+          totalPresupuestadoUSD,
+          totalGastadoUSD,
+          desviacionPct,
+          totalPartidas: state.partidas.length,
+          partidasCompletas,
+          diasTranscurridos,
+          diasRestantes,
+        },
+        curvaData,
+        hitos,
+        imagenes: imagenes.map(img => ({
+          id: img.id,
+          nombre: img.nombre,
+          descripcion: img.descripcion,
+          fecha: img.fecha,
+          ubicacion: img.ubicacion,
+          dataUrl: img.dataUrl,
+        })),
+        generadoEn: new Date().toISOString(),
+      };
+
+      const token  = localStorage.getItem('obratrack_token');
+      const resp   = await fetch('/api/shares', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ proyectoId: proyectoActivo.id, snapshot }),
+      });
+
+      if (!resp.ok) throw new Error('Error del servidor');
+
+      const { token: shareToken } = await resp.json();
+      const url = `${window.location.origin}/share/${shareToken}`;
+      setSharedUrl(url);
+
+      await navigator.clipboard.writeText(url);
+      toast.success('Link copiado al portapapeles', { description: url });
+    } catch (err) {
+      console.error(err);
+      toast.error('No se pudo generar el link');
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const fechaFmt = (iso?: string) =>
+    iso ? new Date(iso + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
 
   if (!proyectoActivo || state.partidas.length === 0) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+      <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center space-y-3 max-w-sm">
-          <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto">
-            <Building2 className="w-8 h-8 text-slate-500" />
+          <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto">
+            <Building2 className="w-8 h-8 text-muted-foreground opacity-50" />
           </div>
-          <p className="text-slate-300 font-semibold">No hay proyecto activo</p>
-          <p className="text-slate-500 text-sm">
-            Seleccioná un proyecto desde el panel de control para ver su avance.
+          <p className="font-semibold text-lg">Sin proyecto activo</p>
+          <p className="text-sm text-muted-foreground">
+            Seleccioná un proyecto e importá el presupuesto para ver la vista del cliente.
           </p>
         </div>
       </div>
@@ -81,77 +214,111 @@ export default function DashboardCliente() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      {/* ── Hero ── */}
-      <div className="relative h-52 overflow-hidden">
-        <img src={HERO_IMG} alt="Obra" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
+    <div className="min-h-screen bg-slate-950 text-white -mx-4 -mt-5 lg:-mx-8 lg:-mt-6 px-4 py-6 lg:px-8">
 
-        <div className="absolute inset-0 flex flex-col justify-end px-5 pb-5">
-          {/* Badge tipo */}
-          <span className="self-start mb-2 text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-            Dashboard Ejecutivo
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-6">
+        <div className="flex-1 min-w-0">
+          <span className="inline-block text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 mb-2">
+            Vista Ejecutiva
           </span>
-          <div className="flex items-end justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="text-2xl font-extrabold leading-tight truncate">
-                {proyectoActivo.nombre}
-              </h1>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
-                {proyectoActivo.ubicacion && (
-                  <span className="flex items-center gap-1 text-xs text-slate-400">
-                    <MapPin className="w-3 h-3" />
-                    {proyectoActivo.ubicacion}
-                  </span>
-                )}
-                {proyectoActivo.fechaInicio && (
-                  <span className="flex items-center gap-1 text-xs text-slate-400">
-                    <Calendar className="w-3 h-3" />
-                    {fechaFormateada(proyectoActivo.fechaInicio)}
-                    {proyectoActivo.fechaFin && ` → ${fechaFormateada(proyectoActivo.fechaFin)}`}
-                  </span>
-                )}
-              </div>
-            </div>
-            <ShareButton />
+          <h1 className="text-2xl font-extrabold leading-tight">{proyectoActivo.nombre}</h1>
+          {proyectoActivo.descripcion && (
+            <p className="text-sm text-slate-400 mt-1">{proyectoActivo.descripcion}</p>
+          )}
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+            {proyectoActivo.ubicacion && (
+              <span className="flex items-center gap-1 text-xs text-slate-500">
+                <MapPin className="w-3 h-3" />{proyectoActivo.ubicacion}
+              </span>
+            )}
+            <span className="flex items-center gap-1 text-xs text-slate-500">
+              <Calendar className="w-3 h-3" />
+              {fechaFmt(proyectoActivo.fechaInicio)}
+              {proyectoActivo.fechaFin && ` → ${fechaFmt(proyectoActivo.fechaFin)}`}
+            </span>
           </div>
+        </div>
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <ShareButton onShare={handleShare} sharing={sharing} />
+          {sharedUrl && (
+            <a
+              href={sharedUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+            >
+              <Check className="w-3 h-3" />
+              Ver link generado
+            </a>
+          )}
         </div>
       </div>
 
-      {/* ── Cuerpo ── */}
-      <div className="px-4 py-5 space-y-4 max-w-3xl mx-auto pb-12">
-
-        {/* Módulo 1: Donuts */}
-        <AvanceFisicoFinanciero
-          avanceFisico={avanceFisico}
-          avanceFinanciero={avanceFinanciero}
-          totalPresupuestadoUSD={totalPresupuestadoUSD}
-          totalGastadoUSD={totalGastadoUSD}
+      {/* ── KPIs ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+        <KpiCard label="Presupuesto" value={fmtUSD(totalPresupuestadoUSD)} icon={DollarSign} color="cyan" />
+        <KpiCard
+          label="Ejecutado"
+          value={fmtUSD(totalGastadoUSD)}
+          icon={TrendingUp}
+          color={desviacionPct > 20 ? 'red' : desviacionPct > 10 ? 'amber' : 'green'}
         />
-
-        {/* Módulo 2: Curva S */}
-        <CurvaAvanceS
-          partidas={state.partidas}
-          ejecuciones={state.ejecuciones}
-          fechaInicio={proyectoActivo.fechaInicio}
-          fechaFin={proyectoActivo.fechaFin}
+        <KpiCard
+          label="Desviación"
+          value={`${desviacionPct > 0 ? '+' : ''}${desviacionPct.toFixed(1)}%`}
+          icon={desviacionPct > 10 ? AlertTriangle : TrendingDown}
+          color={desviacionPct > 20 ? 'red' : desviacionPct > 10 ? 'amber' : 'green'}
+          sub={desviacionPct > 0 ? 'sobre presupuesto' : 'bajo presupuesto'}
         />
-
-        {/* Módulo 3: Hitos + Fotos */}
-        <HitosYFotos
-          resumenes={resumenes}
-          imagenes={imagenes}
-          onSubirImagen={subirImagen}
-          onEliminarImagen={eliminarImagen}
+        <KpiCard
+          label="Partidas"
+          value={`${partidasCompletas} / ${state.partidas.length}`}
+          icon={Layers}
+          color="default"
+          sub="completadas"
         />
-
-        {/* Footer */}
-        <p className="text-center text-xs text-slate-600 pt-2">
-          Generado por ObraTrack · {new Date().toLocaleDateString('es-ES', {
-            day: '2-digit', month: 'long', year: 'numeric',
-          })}
-        </p>
+        <KpiCard
+          label="Días transcurridos"
+          value={`${diasTranscurridos}d`}
+          icon={Clock}
+          color="default"
+        />
+        <KpiCard
+          label={diasRestantes !== null ? 'Días restantes' : 'Sin fecha fin'}
+          value={diasRestantes !== null ? `${diasRestantes}d` : '—'}
+          icon={Calendar}
+          color={diasRestantes !== null && diasRestantes < 30 ? 'amber' : 'default'}
+        />
       </div>
+
+      {/* ── Fila 1: Donuts | Curva S ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        <div className="lg:col-span-1">
+          <AvanceFisicoFinanciero
+            avanceFisico={avanceFisico}
+            avanceFinanciero={avanceFinanciero}
+            totalPresupuestadoUSD={totalPresupuestadoUSD}
+            totalGastadoUSD={totalGastadoUSD}
+          />
+        </div>
+        <div className="lg:col-span-2">
+          <CurvaAvanceS
+            partidas={state.partidas}
+            ejecuciones={state.ejecuciones}
+            fechaInicio={proyectoActivo.fechaInicio}
+            fechaFin={proyectoActivo.fechaFin}
+          />
+        </div>
+      </div>
+
+      {/* ── Fila 2: Hitos + Fotos ── */}
+      <HitosYFotos
+        resumenes={resumenes}
+        imagenes={imagenes}
+        onSubirImagen={subirImagen}
+        onEliminarImagen={eliminarImagen}
+      />
     </div>
   );
 }

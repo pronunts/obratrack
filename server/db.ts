@@ -100,4 +100,15 @@ client.execute(`
   );
 `);
 
+client.execute(`
+  CREATE TABLE IF NOT EXISTS shares (
+    id TEXT PRIMARY KEY,
+    proyecto_id TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    snapshot TEXT NOT NULL,
+    creado_en TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+`);
+
 export const db = drizzle(client, { schema });
