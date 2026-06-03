@@ -46,7 +46,7 @@ function KpiCard({ label, value, sub, color = 'default', icon: Icon }: {
 
 function Spinner() {
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+    <div className="dark min-h-screen bg-slate-950 flex items-center justify-center">
       <div className="text-center space-y-3">
         <div className="w-10 h-10 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" />
         <p className="text-slate-400 text-sm">Cargando reporte...</p>
@@ -57,7 +57,7 @@ function Spinner() {
 
 function NotFound() {
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
+    <div className="dark min-h-screen bg-slate-950 flex items-center justify-center px-4">
       <div className="text-center space-y-4 max-w-sm">
         <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto">
           <Building2 className="w-8 h-8 text-slate-500" />
@@ -102,7 +102,7 @@ export default function ShareCliente() {
     iso ? new Date(iso + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="dark min-h-screen bg-slate-950 text-white">
 
       {/* ── Navbar mínima ── */}
       <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-sm border-b border-slate-800 px-4 py-3 flex items-center gap-3">

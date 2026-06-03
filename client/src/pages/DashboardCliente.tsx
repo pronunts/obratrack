@@ -214,7 +214,7 @@ export default function DashboardCliente() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white -mx-4 -mt-5 lg:-mx-8 lg:-mt-6 px-4 py-6 lg:px-8">
+    <div className="dark min-h-screen bg-slate-950 text-white -mx-4 -mt-5 lg:-mx-8 lg:-mt-6 px-4 py-6 lg:px-8">
 
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-6">

@@ -50,6 +50,18 @@ function RegistroForm({ partida, onClose }: RegistroFormProps) {
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Cuánto ya fue ejecutado en esta partida
+  const yaEjecutado = state.ejecuciones
+    .filter(e => e.partidaId === partida.id)
+    .reduce((s, e) => s + e.cantidadEjecutada, 0);
+  const restante = Math.max(0, partida.cantidadPlaneada - yaEjecutado);
+  const pctActual = partida.cantidadPlaneada > 0
+    ? Math.min((yaEjecutado / partida.cantidadPlaneada) * 100, 100)
+    : 0;
+  const completa = restante <= 0;
+
+  const fmt = (n: number) => n.toLocaleString('es-US', { maximumFractionDigits: 2 });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cant = parseFloat(cantidad);
@@ -58,10 +70,17 @@ function RegistroForm({ partida, onClose }: RegistroFormProps) {
       inputRef.current?.focus();
       return;
     }
+    if (cant > restante) {
+      toast.error(`Supera el máximo permitido`, {
+        description: `Podés registrar hasta ${fmt(restante)} ${partida.unidad} (${(100 - pctActual).toFixed(1)}% restante)`,
+      });
+      inputRef.current?.focus();
+      return;
+    }
     setSaving(true);
     await new Promise(r => setTimeout(r, 300));
     registrarEjecucion(partida.id, cant, fecha, obs || undefined);
-    toast.success(`✓ ${cant} ${partida.unidad} registrados`, {
+    toast.success(`✓ ${fmt(cant)} ${partida.unidad} registrados`, {
       description: state.isOnline ? 'Guardado y sincronizado' : 'Guardado localmente — pendiente de sincronización',
     });
     setSaving(false);
@@ -79,6 +98,11 @@ function RegistroForm({ partida, onClose }: RegistroFormProps) {
                 {partida.codigo}
               </span>
               <Badge variant="outline" className="text-xs">{partida.unidad}</Badge>
+              {completa && (
+                <Badge className="text-xs bg-emerald-500 text-white border-0">
+                  100% completada
+                </Badge>
+              )}
             </div>
             <p className="font-semibold text-sm leading-snug">{partida.descripcion}</p>
           </div>
@@ -89,9 +113,30 @@ function RegistroForm({ partida, onClose }: RegistroFormProps) {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
+
+          {/* Barra de avance actual */}
+          <div className="bg-muted/50 rounded-xl p-3 space-y-1.5">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Ejecutado: <span className="font-semibold text-foreground tabular-nums">{fmt(yaEjecutado)} {partida.unidad}</span></span>
+              <span className="font-semibold tabular-nums">{pctActual.toFixed(1)}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${pctActual >= 100 ? 'bg-emerald-500' : 'bg-primary'}`}
+                style={{ width: `${Math.min(pctActual, 100)}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {completa
+                ? 'Esta partida ya está al 100% — no se puede registrar más avance.'
+                : <>Disponible para registrar: <span className="font-semibold text-foreground tabular-nums">{fmt(restante)} {partida.unidad}</span> ({(100 - pctActual).toFixed(1)}%)</>
+              }
+            </p>
+          </div>
+
           <div className="space-y-1.5">
             <Label htmlFor="cantidad" className="text-sm font-semibold">
-              Cantidad Ejecutada ({partida.unidad})
+              Cantidad a Registrar ({partida.unidad})
             </Label>
             <Input
               ref={inputRef}
@@ -99,11 +144,13 @@ function RegistroForm({ partida, onClose }: RegistroFormProps) {
               type="number"
               step="0.01"
               min="0.01"
+              max={restante > 0 ? restante : undefined}
               value={cantidad}
               onChange={(e) => setCantidad(e.target.value)}
-              placeholder={`Ej. 12.5 ${partida.unidad}`}
+              placeholder={completa ? 'Partida completada' : `Máx. ${fmt(restante)} ${partida.unidad}`}
               className="h-14 text-xl font-bold text-center tabular-nums"
               autoFocus
+              disabled={completa}
               required
             />
           </div>
@@ -140,7 +187,7 @@ function RegistroForm({ partida, onClose }: RegistroFormProps) {
             <Button type="button" variant="outline" className="flex-1 h-13" onClick={onClose}>
               Cancelar
             </Button>
-            <Button type="submit" className="flex-1 h-13 text-base font-bold" disabled={saving}>
+            <Button type="submit" className="flex-1 h-13 text-base font-bold" disabled={saving || completa}>
               {saving ? (
                 <span className="flex items-center gap-2">
                   <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
