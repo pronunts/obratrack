@@ -29,20 +29,20 @@ function KpiCard({ label, value, sub, color = 'default', icon: Icon }: {
   icon?: React.ComponentType<{ className?: string }>;
 }) {
   const colorMap = {
-    default: 'text-slate-200',
-    green:   'text-emerald-400',
-    red:     'text-red-400',
-    amber:   'text-amber-400',
-    cyan:    'text-cyan-400',
+    default: 'text-foreground',
+    green:   'text-emerald-600 dark:text-emerald-400',
+    red:     'text-red-600 dark:text-red-400',
+    amber:   'text-amber-600 dark:text-amber-400',
+    cyan:    'text-cyan-600 dark:text-cyan-400',
   };
   return (
-    <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-4">
+    <div className="bg-card border border-border rounded-xl p-4">
       <div className="flex items-center gap-2 mb-1">
-        {Icon && <Icon className="w-3.5 h-3.5 text-slate-500" />}
-        <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">{label}</p>
+        {Icon && <Icon className="w-3.5 h-3.5 text-muted-foreground" />}
+        <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">{label}</p>
       </div>
       <p className={`text-lg font-extrabold tabular-nums ${colorMap[color]}`}>{value}</p>
-      {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
+      {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
     </div>
   );
 }
@@ -110,20 +110,20 @@ export default function DashboardCliente() {
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-6">
         <div className="flex-1 min-w-0">
-          <span className="inline-block text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 mb-2">
+          <span className="inline-block text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/30 mb-2">
             Vista Ejecutiva
           </span>
-          <h1 className="text-2xl font-extrabold leading-tight">{proyectoActivo.nombre}</h1>
+          <h1 className="text-2xl font-extrabold leading-tight text-foreground">{proyectoActivo.nombre}</h1>
           {proyectoActivo.descripcion && (
-            <p className="text-sm text-slate-400 mt-1">{proyectoActivo.descripcion}</p>
+            <p className="text-sm text-muted-foreground mt-1">{proyectoActivo.descripcion}</p>
           )}
           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
             {proyectoActivo.ubicacion && (
-              <span className="flex items-center gap-1 text-xs text-slate-500">
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
                 <MapPin className="w-3 h-3" />{proyectoActivo.ubicacion}
               </span>
             )}
-            <span className="flex items-center gap-1 text-xs text-slate-500">
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
               <Calendar className="w-3 h-3" />
               {fechaFmt(proyectoActivo.fechaInicio)}
               {proyectoActivo.fechaFin && ` → ${fechaFmt(proyectoActivo.fechaFin)}`}
@@ -204,7 +204,7 @@ export default function DashboardCliente() {
         onEliminarImagen={eliminarImagen}
       />
 
-      <p className="text-center text-xs text-slate-700 pb-4">
+      <p className="text-center text-xs text-muted-foreground pb-4">
         ObraTrack · {new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}
       </p>
 

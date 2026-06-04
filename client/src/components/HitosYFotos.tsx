@@ -46,23 +46,23 @@ function HitoItem({ hito }: { hito: Hito }) {
   return (
     <div className="flex items-center gap-3 py-2.5 border-b border-border/50 last:border-0">
       {esLogrado ? (
-        <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+        <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
       ) : esProximo ? (
         <div className="w-4 h-4 shrink-0 flex items-center justify-center">
-          <div className="w-2.5 h-2.5 rounded-full bg-orange-400" />
+          <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
         </div>
       ) : (
-        <Clock className="w-4 h-4 shrink-0 text-cyan-400" />
+        <Clock className="w-4 h-4 shrink-0 text-cyan-600 dark:text-cyan-400" />
       )}
       <span className={`flex-1 text-sm leading-snug ${
         esLogrado ? 'text-muted-foreground line-through opacity-70' :
-        esProximo ? 'text-orange-300' : 'text-cyan-300'
+        esProximo ? 'text-orange-600 dark:text-orange-300' : 'text-cyan-600 dark:text-cyan-300'
       }`}>
         {hito.label}
       </span>
       <span className={`text-xs font-bold tabular-nums shrink-0 ${
-        esLogrado ? 'text-emerald-400' :
-        esProximo ? 'text-orange-400' : 'text-cyan-400'
+        esLogrado ? 'text-emerald-600 dark:text-emerald-400' :
+        esProximo ? 'text-orange-600 dark:text-orange-400' : 'text-cyan-600 dark:text-cyan-400'
       }`}>
         {hito.pct}%
       </span>
@@ -220,7 +220,7 @@ export function HitosYFotos({
               {/* Logrados */}
               {logrados.length > 0 && (
                 <div>
-                  <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1">
+                  <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-1">
                     Logrado
                   </p>
                   {logrados.map(h => <HitoItem key={h.label} hito={h} />)}
@@ -229,7 +229,7 @@ export function HitosYFotos({
               {/* Próximos / En curso */}
               {proximos.length > 0 && (
                 <div>
-                  <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1">
+                  <p className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-widest mb-1">
                     Próximo / En Curso
                   </p>
                   {proximos.slice(0, 5).map(h => <HitoItem key={h.label} hito={h} />)}
