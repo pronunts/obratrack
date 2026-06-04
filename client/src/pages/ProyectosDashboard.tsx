@@ -193,7 +193,7 @@ function NuevoProyectoForm({ onClose, onCreated }: NuevoProyectoFormProps) {
           {/* Tasa */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">Tasa de Cambio (Local / USD)</Label>
-            <Input type="number" value={tasaCambio} min="0.0001" step="0.01"
+            <Input type="number" value={tasaCambio} min="0.0001" step="any"
               onChange={e => { setTasaCambio(e.target.value); setErrors(ev => ({ ...ev, tasaCambio: '' })); }}
               placeholder="Ej. 4200" className="h-11 font-mono" />
             {errors.tasaCambio && <p className="text-xs text-red-500">{errors.tasaCambio}</p>}
