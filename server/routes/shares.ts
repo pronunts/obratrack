@@ -94,45 +94,71 @@ function computeSnapshot(
   const curvaPlan = sigmoidCurva(inicio, fin);
   const duracionMs = fin.getTime() - inicio.getTime();
 
-  const porMes = new Map<string, typeof allEjecuciones>();
-  for (const ej of allEjecuciones) {
-    const fecha = new Date(ej.fecha + 'T12:00:00');
-    const clave = fecha.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
-    const lista = porMes.get(clave) ?? [];
-    lista.push(ej);
-    porMes.set(clave, lista);
-  }
+  const mesLabel = (d: Date) =>
+    d.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
 
-  const mesesOrdenados: string[] = [];
-  for (let i = 0; i <= PUNTOS; i++) {
-    const fecha = new Date(inicio.getTime() + duracionMs * (i / PUNTOS));
-    const mes   = fecha.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
-    if (!mesesOrdenados.includes(mes)) mesesOrdenados.push(mes);
-  }
-
-  const avanceRealPorMes = new Map<string, number>();
-  const ejAcum           = new Map<string, number>();
-
-  for (const mes of mesesOrdenados) {
-    for (const ej of (porMes.get(mes) ?? [])) {
-      ejAcum.set(ej.partidaId, (ejAcum.get(ej.partidaId) ?? 0) + ej.cantidadEjecutada);
+  const progressAt = (d: Date): number => {
+    if (totalPresupuesto === 0) return 0;
+    const cutoff = d.toISOString().slice(0, 10);
+    const ejHasta = allEjecuciones.filter((ej: any) => ej.fecha <= cutoff);
+    const ejPP = new Map<string, number>();
+    for (const ej of ejHasta) {
+      ejPP.set(ej.partidaId, (ejPP.get(ej.partidaId) ?? 0) + ej.cantidadEjecutada);
     }
-    let ap = 0;
+    let acc = 0;
     for (const p of allPartidas) {
-      const ej2    = ejAcum.get(p.id) ?? 0;
-      const pPct   = p.cantidadPlaneada > 0 ? Math.min(ej2 / p.cantidadPlaneada, 1) : 0;
-      ap += pPct * (totalPresupuesto > 0 ? p.precioTotalUSD / totalPresupuesto : 0);
+      const ej  = ejPP.get(p.id) ?? 0;
+      const pct = p.cantidadPlaneada > 0 ? Math.min(ej / p.cantidadPlaneada, 1) : 0;
+      acc += pct * (p.precioTotalUSD / totalPresupuesto);
     }
-    avanceRealPorMes.set(mes, Math.round(ap * 1000) / 10);
+    return Math.round(acc * 1000) / 10;
+  };
+
+  // Mapa de puntos (deduplicado por mes)
+  const curvaMap = new Map<string, { date: Date; planificado: number; real?: number }>();
+
+  // Puntos del plan
+  for (let i = 0; i <= PUNTOS; i++) {
+    const d   = new Date(inicio.getTime() + duracionMs * (i / PUNTOS));
+    const mes = mesLabel(d);
+    if (!curvaMap.has(mes)) curvaMap.set(mes, { date: d, planificado: curvaPlan[i]?.planificado ?? 0 });
   }
 
-  const curvaData = curvaPlan.map(({ mes, planificado }, i) => {
-    const fechaPunto = new Date(inicio.getTime() + duracionMs * (i / PUNTOS));
-    const real = fechaPunto <= hoy && avanceRealPorMes.has(mes)
-      ? avanceRealPorMes.get(mes)
-      : undefined;
-    return { mes, planificado, real };
-  });
+  // Anclajes mensuales pasados
+  if (allEjecuciones.length > 0 && hoy >= inicio) {
+    const anchors: Date[] = [new Date(inicio)];
+    const cursor = new Date(inicio);
+    cursor.setDate(1);
+    cursor.setMonth(cursor.getMonth() + 1);
+    while (cursor <= hoy) { anchors.push(new Date(cursor)); cursor.setMonth(cursor.getMonth() + 1); }
+    anchors.push(new Date(hoy));
+
+    for (const d of anchors) {
+      if (d > hoy) continue;
+      const mes  = mesLabel(d);
+      const real = progressAt(d);
+      if (curvaMap.has(mes)) curvaMap.set(mes, { ...curvaMap.get(mes)!, real });
+      else {
+        const t = Math.max(0, Math.min(1, (d.getTime() - inicio.getTime()) / duracionMs));
+        const s = 1 / (1 + Math.exp(-10 * (t - 0.5)));
+        const plan = Math.round(((s - sigMin) / (sigMax - sigMin)) * 1000) / 10;
+        curvaMap.set(mes, { date: d, planificado: plan, real });
+      }
+    }
+  }
+
+  let curvaData = Array.from(curvaMap.values())
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .map(({ date, planificado, real }) => ({
+      mes: mesLabel(date),
+      planificado: Math.round(planificado * 10) / 10,
+      real: date > hoy ? undefined : real,
+    }));
+
+  // Garantizar mínimo 2 puntos reales para que Recharts dibuje una línea
+  if (allEjecuciones.length > 0 && curvaData.filter(d => d.real !== undefined).length === 1) {
+    curvaData = [{ mes: 'Inicio', planificado: 0, real: 0 }, ...curvaData];
+  }
 
   return {
     proyecto: {
